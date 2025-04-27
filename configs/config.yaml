@@ -1,0 +1,45 @@
+device: 'cuda'
+seed: 42
+output_dir: ./work_dirs
+num_workers: 2
+frozen_weights: null
+resume: null
+
+data:
+  data_root: ./data/change
+  transform: True
+  resizing: False
+  patch: False
+  flip: False
+
+model:
+  backbone_name: "swin_base_patch4_window7_224"
+  out_dims: [256, 256, 256, 256]
+  pretrained: True
+  img_size: 512
+  model_name: "microsoft/phi-1_5"  # microsoft/phi-1_5、bert-base-uncased
+
+loss:
+  weight_ce: 1.0
+  weight_dice: 1.0
+  weight_focal: 1.0
+  weight_bcl: 0.2
+
+logger:
+  file_base: ./work_dirs
+  log_name: 'Seg_log'
+  level: 'INFO'
+
+training:
+  start_epoch: 1
+  epochs: 200
+  lr: 0.0001
+  lr_backbone: 0.00001
+  lr_drop: 200
+  batch_size: 4
+  eval_freq: 1
+  start_eval: 1
+
+test:
+  batch_size: 1
+  weight_path: "./work_dirs/best_f1.pth"
