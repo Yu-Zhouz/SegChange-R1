@@ -24,7 +24,7 @@ class TextEncoder(nn.Module):
         max_memory = {0: "10GB"}
         self.llm = AutoModelForCausalLM.from_pretrained(
             model_name, device_map="auto", torch_dtype=torch.float32,
-            max_memory=max_memory, local_files_only=True).to(self.device)
+            max_memory=max_memory).to(self.device)  # , local_files_only=True
 
         # 冻结模型
         for p in self.llm.parameters():
