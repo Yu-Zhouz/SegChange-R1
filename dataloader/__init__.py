@@ -4,6 +4,7 @@ from utils import collate_fn_building
 from torch.utils.data import DataLoader
 import logging
 
+
 def build_dataset(cfg):
     train_set, val_set = loading_data(cfg)
 

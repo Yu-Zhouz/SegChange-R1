@@ -30,14 +30,14 @@
           </mappings>
         </serverdata>
       </paths>
-      <paths name="root@172.16.15.10:30467 password">
+      <paths name="root@172.16.15.10:30451 password">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="yolov11">
+      <paths name="root@172.16.15.10:30467 password">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />

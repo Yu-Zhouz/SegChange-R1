@@ -9,38 +9,50 @@
 @Usage   :
 """
 from torch import nn
-from models import MaskGenerator, DualInputVisualEncoder, FeatureDiffModule, build_textencoder
+from models import MaskGenerator, DualInputVisualEncoder, FeatureDiffModule, TextEncoderBert, TextEncoderLLM
 from models.losses import TotalLoss
+
 
 class ChangeModel(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
         self.device = self.cfg.device
-        self.dual_encoder = DualInputVisualEncoder(self.cfg).to(self.device)
-        self.feature_diff = FeatureDiffModule(in_channels_list=self.cfg.model.out_dims).to(self.device)
+        self.dual_encoder = DualInputVisualEncoder(cfg).to(self.device)
+        self.feature_diff = FeatureDiffModule(in_channels_list=self.cfg.model.out_dims, diff_attention=self.cfg.model.diff_attention).to(self.device)
+        self.lang_dim = 2048 if cfg.model.text_encoder_name == 'microsoft/phi-1_5' else 768
         self.mask_generator = MaskGenerator(
             in_channels=self.cfg.model.out_dims[-2],
             feature_strides=[4, 8, 16, 32],
             num_classes=1,
-            lang_dim=2048 if cfg.model.model_name == 'microsoft/phi-1_5' else 768,
+            lang_dim=self.lang_dim,
             n_heads=8
         ).to(self.device)
-        TextEncoder = build_textencoder(cfg)
-        self.llm = TextEncoder(model_name=cfg.model.model_name).to(self.device)
+        self.use_text_description = cfg.model.use_text_description  # 新增参数
 
-    def forward(self, image1, image2, prompts):
-        # 确保输入数据在正确的设备上
+        if self.use_text_description:
+            if cfg.model.text_encoder_name == "microsoft/phi-1_5":
+                self.llm = TextEncoderLLM(model_name=cfg.model.text_encoder_name,
+                                          freeze_text_encoder=cfg.model.freeze_text_encoder).to(self.device)
+            elif cfg.model.text_encoder_name == "bert-base-uncased":
+                self.llm = TextEncoderBert(model_name=cfg.model.text_encoder_name,
+                                           freeze_text_encoder=cfg.model.freeze_text_encoder).to(self.device)
+            else:
+                raise NotImplementedError(f"Unsupported text encoder name: {cfg.model.text_encoder_name}")
+
+    def forward(self, image1, image2, prompts=None):
         image1 = image1.to(self.device)
         image2 = image2.to(self.device)
 
-        # 提取多尺度 BEV 特征
         multi_scale_bev_feats1, multi_scale_bev_feats2 = self.dual_encoder(image1, image2)
-        # 计算多尺度 BEV 特征差异
         multi_scale_diff_feats = self.feature_diff(multi_scale_bev_feats1, multi_scale_bev_feats2)
-        # 处理文本描述
-        description_embeddings, _ = self.llm(prompts)
-        # 生成变化掩码
+
+        if self.use_text_description and prompts is not None:
+            description_embeddings, _ = self.llm(prompts)
+        else:
+            # 如果不使用文本描述，可以使用占位符或默认值
+            description_embeddings = torch.zeros((image1.size(0), 4, self.lang_dim), device=self.device)
+
         mask = self.mask_generator(multi_scale_diff_feats, description_embeddings)
         return mask
 
@@ -49,8 +61,10 @@ class ChangeModel(nn.Module):
         self.dual_encoder = self.dual_encoder.to(device)
         self.feature_diff = self.feature_diff.to(device)
         self.mask_generator = self.mask_generator.to(device)
-        self.llm = self.llm.to(device)
+        if self.use_text_description:
+            self.llm = self.llm.to(device)
         return self
+
 
 def build_model(cfg, training=False):
     model = ChangeModel(cfg)
@@ -58,14 +72,23 @@ def build_model(cfg, training=False):
         return model
 
     # 创建损失函数
-    losses = TotalLoss(weight_ce=cfg.loss.weight_ce, weight_dice=cfg.loss.weight_dice, weight_focal=cfg.loss.weight_focal, weight_bcl=cfg.loss.weight_bcl)
+    losses = TotalLoss(
+        weight_ce=cfg.loss.weight_ce,
+        weight_dice=cfg.loss.weight_dice,
+        weight_focal=cfg.loss.weight_focal,
+        alpha=cfg.loss.alpha,
+        gamma=cfg.loss.gamma,
+        weight_bcl=cfg.loss.weight_bcl
+    )
 
     return model, losses
+
 
 # 测试
 if __name__ == '__main__':
     import torch
     from utils import load_config
+
     cfg = load_config("../configs/config.yaml")
     model = ChangeModel(cfg)
     image1 = torch.randn(2, 3, 512, 512).to('cuda')
@@ -80,5 +103,6 @@ if __name__ == '__main__':
     print(f"Total parameters: {total_params}")
 
     from thop import profile
+
     flops, params = profile(model, inputs=(image1, image2, prompts))
     print(f"FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")

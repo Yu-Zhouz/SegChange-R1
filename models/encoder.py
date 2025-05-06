@@ -11,18 +11,24 @@
 import torch.nn as nn
 from models import VisualEncoder, BEVTransformer, BEVLinearAttention
 
+
 class DualInputVisualEncoder(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         self.encoder = VisualEncoder(cfg)
         # 添加1×1卷积层用于统一通道
         self.conv_list = nn.ModuleList([nn.Conv2d(in_dim, out_dim, kernel_size=1) for in_dim, out_dim in zip([128, 256, 512, 1024], cfg.model.out_dims)])
-        # self.bev_transformers = nn.ModuleList([
-        #     BEVTransformer(in_channels=out_dim, out_channels=out_dim) for out_dim in cfg.model.out_dims
-        # ])
-        self.bev_transformers = nn.ModuleList([
-            BEVLinearAttention(in_channels=out_dim, out_channels=out_dim) for out_dim in cfg.model.out_dims
-        ])
+
+        if cfg.model.bev_name == 'Transformer':
+            self.bev = nn.ModuleList([
+                BEVTransformer(in_channels=out_dim, out_channels=out_dim) for out_dim in cfg.model.out_dims
+            ])
+        elif cfg.model.bev_name == 'LinearAttention':
+            self.bev = nn.ModuleList([
+                BEVLinearAttention(in_channels=out_dim, out_channels=out_dim) for out_dim in cfg.model.out_dims
+            ])
+        else:
+            raise ValueError(f"Invalid bev_name: {cfg.model.bev_name}")
 
     def forward(self, image1, image2):
         # 提取两幅图像的多尺度特征
@@ -35,8 +41,8 @@ class DualInputVisualEncoder(nn.Module):
         multi_scale_bev_feats1 = []
         multi_scale_bev_feats2 = []
         for i in range(len(feats1)):
-            feat1_bev = self.bev_transformers[i](feats1[i])
-            feat2_bev = self.bev_transformers[i](feats2[i])
+            feat1_bev = self.bev[i](feats1[i])
+            feat2_bev = self.bev[i](feats2[i])
             multi_scale_bev_feats1.append(feat1_bev)
             multi_scale_bev_feats2.append(feat2_bev)
         return multi_scale_bev_feats1, multi_scale_bev_feats2

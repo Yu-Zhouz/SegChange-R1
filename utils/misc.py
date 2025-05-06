@@ -8,9 +8,7 @@
 @Desc    : 杂项函数，包括分布式帮助程序，大部分是从 torchvision 参考资料中复制粘贴的。
 @Usage   :
 """
-import logging
 import os
-import pprint
 import subprocess
 import sys
 import time
@@ -21,7 +19,6 @@ from typing import Optional, List
 import numpy as np
 import torch
 import torch.distributed as dist
-import yaml
 from torch import Tensor
 import torch.nn as nn
 import torch.nn.functional as F

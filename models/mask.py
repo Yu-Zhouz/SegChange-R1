@@ -10,8 +10,10 @@
 """
 import torch
 import torch.nn as nn
-from models import DProjector
+from models import DProjector, TokenConnector
 
+
+# TODO:待完善，效果不好
 
 class MaskGenerator(nn.Module):
     def __init__(self, in_channels, feature_strides=[4, 8, 16, 32], num_classes=1, lang_dim=2048, n_heads=8):
@@ -32,17 +34,20 @@ class MaskGenerator(nn.Module):
                 )
             )
 
+        # 添加 TokenConnector
+        self.token_connector = TokenConnector(in_channels=in_channels, out_channels=in_channels // 2)
+
         # D-Projector
-        self.d_projector = DProjector(vis_dim=in_channels, lang_dim=lang_dim, n_heads=n_heads)
+        self.d_projector = DProjector(vis_dim=in_channels // 2, lang_dim=lang_dim, n_heads=n_heads)
 
         # Transformer 解码器
         self.transformer_decoder = nn.TransformerDecoder(
-            nn.TransformerDecoderLayer(d_model=in_channels, nhead=n_heads, dim_feedforward=2048),
-            num_layers=6
+            nn.TransformerDecoderLayer(d_model=in_channels // 2, nhead=n_heads, dim_feedforward=2048),
+            num_layers=2
         )
 
         # 最终掩码预测层
-        self.mask_predictor = nn.Conv2d(in_channels, num_classes, kernel_size=1)
+        self.mask_predictor = nn.Conv2d(in_channels // 2, num_classes, kernel_size=1)
 
     def forward(self, multi_scale_feats, description_embeddings):
         """
@@ -57,6 +62,9 @@ class MaskGenerator(nn.Module):
 
         # 合并多尺度特征
         merged_feat = torch.stack(processed_feats, dim=0).mean(dim=0)  # [B, C, H, W]
+
+        # 使用 TokenConnector 转换视觉特征
+        merged_feat = self.token_connector(merged_feat)
 
         # D-Projector
         query_vec = self.d_projector(description_embeddings, merged_feat)  # [B, C]
@@ -82,7 +90,8 @@ class MaskGenerator(nn.Module):
 
 # 测试
 if __name__ == '__main__':
-    model = MaskGenerator(in_channels=256, feature_strides=[4, 8, 16, 32], num_classes=1, lang_dim=2048, n_heads=8).to('cuda')
+    model = MaskGenerator(in_channels=256, feature_strides=[4, 8, 16, 32], num_classes=1, lang_dim=2048, n_heads=8).to(
+        'cuda')
     multi_scale_feats = [torch.randn(2, 256, 128, 128).to('cuda'),
                          torch.randn(2, 256, 64, 64).to('cuda'),
                          torch.randn(2, 256, 32, 32).to('cuda'),
@@ -92,5 +101,6 @@ if __name__ == '__main__':
     print(logits.shape)  # 验证输出形状
 
     from thop import profile
+
     flops, params = profile(model, inputs=(multi_scale_feats, description_embeddings))
     print(f"MaskGenerator FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")

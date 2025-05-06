@@ -24,7 +24,7 @@ def export_png_filenames_to_txt(directory, output_file, additional_text):
 
 
 # 使用示例
-directory_path = '../data/change_test/train/A'  # 替换为你的图像目录路径
-output_txt_path = '../data/change_test/train/prompts.txt'  # 输出的 .txt 文件路径
+directory_path = '../data/change/val/A'  # 替换为你的图像目录路径
+output_txt_path = '../data/change/val/prompts.txt'  # 输出的 .txt 文件路径
 additional_text = 'Buildings with changes'
 export_png_filenames_to_txt(directory_path, output_txt_path, additional_text)

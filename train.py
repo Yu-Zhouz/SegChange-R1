@@ -11,7 +11,6 @@
 import argparse
 import os
 import pprint
-import pytest
 import numpy as np
 import torch
 import datetime
@@ -80,8 +79,8 @@ def main():
     ]
 
     optimizer = torch.optim.Adam(param_dicts, lr=cfg.training.lr)
-    # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, cfg.training.lr_drop)
-    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10, verbose=True)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, cfg.training.lr_drop)
+    # lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10, verbose=True)
     # 打印优化器详细信息
     optimizer_info = f"optimizer: Adam(lr={cfg.training.lr})"
     optimizer_info += " with parameter groups "

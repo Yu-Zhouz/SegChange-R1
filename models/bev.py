@@ -38,8 +38,8 @@ class BEVTransformer(nn.Module):
         self.transformer = nn.Transformer(
             d_model=in_channels,
             nhead=8,
-            num_encoder_layers=6,
-            num_decoder_layers=6,
+            num_encoder_layers=2,
+            num_decoder_layers=2,
             batch_first=True
         )
         self.proj = nn.Conv2d(in_channels, out_channels, kernel_size=1)
