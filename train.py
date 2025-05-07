@@ -22,7 +22,7 @@ from tensorboardX import SummaryWriter
 from dataloader import build_dataset
 from engines import train, evaluate
 from models import build_model
-from utils import setup_logging, load_config, get_environment_info, get_rank
+from utils import *
 
 
 warnings.filterwarnings('ignore')
@@ -42,7 +42,8 @@ def get_args_config():
 def main():
     # cfg = load_config("./configs/config.yaml")
     cfg = get_args_config()
-    logger = setup_logging(cfg, log_name=cfg.name)
+    output_dir = get_output_dir(cfg)
+    logger = setup_logging(cfg, output_dir)
     logger.info('Train Log %s' % time.strftime("%c"))
     env_info = get_environment_info()
     logger.info(env_info)
@@ -116,7 +117,7 @@ def main():
     iou_list = []
     accuracy_list = []
     # 创建tensorboard
-    tensorboard_dir = os.path.join(cfg.output_dir, 'train', 'tensorboard')
+    tensorboard_dir = os.path.join(str(output_dir), 'tensorboard')
     os.makedirs(tensorboard_dir, exist_ok=True)
     writer = SummaryWriter(tensorboard_dir)
 
@@ -138,7 +139,7 @@ def main():
         # 根据调度改变 lr
         lr_scheduler.step(stat['loss'])
         # 每隔一纪元保存最新权重
-        ckpt_dir = os.path.join(cfg.output_dir, 'train', 'checkpoints')
+        ckpt_dir = os.path.join(str(output_dir), 'checkpoints')
         os.makedirs(ckpt_dir, exist_ok=True)
         checkpoint_latest_path = os.path.join(ckpt_dir, 'latest.pth')
         torch.save({

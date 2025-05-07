@@ -15,7 +15,7 @@ class DProjector(nn.Module):
     def __init__(self, vis_dim, lang_dim, n_heads=8):
         super().__init__()
         # project language dim to vis dim if needed
-        self.lang2vis = nn.Linear(lang_dim, vis_dim) if lang_dim!=vis_dim else nn.Identity()
+        self.lang2vis = nn.Linear(lang_dim, vis_dim) if lang_dim != vis_dim else nn.Identity()
         self.cross_attn = nn.MultiheadAttention(vis_dim, n_heads)
         self.lin = nn.Linear(vis_dim, vis_dim)
 
@@ -30,17 +30,18 @@ class DProjector(nn.Module):
         desc_vis = self.lang2vis(desc_avg)  # [B, C]
 
         # 2) cross-attend to every pixel
-        v = vis_feat.flatten(2).permute(2,0,1)        # [N, B, C]
-        q = desc_vis.unsqueeze(0)                    # [1, B, C]
-        attn_out, _ = self.cross_attn(q, v, v)       # [1, B, C]
+        v = vis_feat.flatten(2).permute(2, 0, 1)  # [N, B, C]
+        q = desc_vis.unsqueeze(0)  # [1, B, C]
+        attn_out, _ = self.cross_attn(q, v, v)  # [1, B, C]
         # residual + linear
-        q2 = self.lin(attn_out + q).squeeze(0)       # [B, C]
+        q2 = self.lin(attn_out + q).squeeze(0)  # [B, C]
         return q2  # this is the single query vector per image
 
 
 # 测试
 if __name__ == '__main__':
     import torch
+
     model = DProjector(vis_dim=256, lang_dim=2048)
     desc_embs = torch.randn(2, 4, 2048)
     vis_feat = torch.randn(2, 256, 512, 512)

@@ -24,7 +24,7 @@ class ChangeModel(nn.Module):
         self.mask_generator = MaskGenerator(
             in_channels=self.cfg.model.out_dims[-2],
             feature_strides=[4, 8, 16, 32],
-            num_classes=1,
+            num_classes=self.cfg.model.num_classes,
             lang_dim=self.lang_dim,
             n_heads=8
         ).to(self.device)

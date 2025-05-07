@@ -154,18 +154,13 @@ def main():
     # 要可视化的层名称（根据你的模型结构填写）
     layers_to_visualize = [
         # feature_diff 模块中的层
+        'feature_diff',
         'feature_diff.diff_conv.0.0',  # 第一个 diff_conv 中的卷积层
-        'feature_diff.attention.0.conv',  # 第一个 attention 中的卷积层
-
+        'feature_diff.attention.0.0',
         # fpn 模块中的层
-        'fpn'
-        
+        'fpn',
         # scale_heads 模块中的层
-        'mask_generator',
-        'mask_generator.scale_heads.0.0',  # 第一个 scale_head 中的卷积层
-        'mask_generator.scale_heads.1.0',  # 第二个 scale_head 中的卷积层
-        'mask_generator.scale_heads.2.0',  # 第三个 scale_head 中的卷积层
-        'mask_generator.scale_heads.3.0',  # 第四个 scale_head 中的卷积层
+        'mask_head',
     ]
 
     # 注册钩子

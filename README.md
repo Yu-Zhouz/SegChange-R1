@@ -59,3 +59,10 @@ python train.py -c ./configs/config.yaml
 ```shell
 python test.py -c ./configs/config.yaml
 ```
+
+
+## 参考
+https://blog.csdn.net/weixin_45679938/article/details/142030784
+https://www.arxiv.org/pdf/2503.11070
+https://www.arxiv.org/abs/2503.16825
+https://zhuanlan.zhihu.com/p/627646794

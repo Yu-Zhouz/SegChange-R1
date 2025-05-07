@@ -1,3 +1,4 @@
+name: 'train'
 device: 'cuda:0'
 seed: 42
 output_dir: ./work_dirs
@@ -13,10 +14,12 @@ data:
   flip: False
 
 model:
+  num_classes: 1
   backbone_name: "swin_base_patch4_window7_224"
   bev_name: "LinearAttention"  # [LinearAttention, Transformer]
   diff_attention: "CBAM"  # ['SE', 'CBAM']
   out_dims: [256, 256, 256, 256]
+  use_token_connector: False  # 是否降低 token 维度
   pretrained: True
   img_size: 512
   use_text_description: True  # 是否使用文本描述
@@ -32,7 +35,6 @@ loss:
   weight_bcl: 0.2  # 衡量正负样本对之间的差异
 
 logger:
-  file_base: ./work_dirs
   log_name: 'Seg_log'
   level: 'INFO'
 

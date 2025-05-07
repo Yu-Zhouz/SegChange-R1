@@ -12,21 +12,18 @@ import logging
 import os
 from datetime import datetime
 
-def setup_logging(cfg, log_name='train'):
+
+def setup_logging(cfg, log_dirs):
     """
     配置日志模块。
     :param config: 配置信息，包含日志级别和日志文件路径。
     :param api: 是否为 API 日志。如果为 True，则日志文件名会包含 "api"。
     """
-    # 获取配置信息
-    log_file_base = cfg.logger.file_base
-    # 在 log_file 目录下根据日期生成日志文件名
-    log_files = os.path.join(log_file_base, log_name)
 
     # 日期命名
     current_date = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    os.makedirs(log_files, exist_ok=True)
-    log_file = os.path.join(log_files, f"{current_date}.log")
+    os.makedirs(log_dirs, exist_ok=True)
+    log_file = os.path.join(log_dirs, f"{current_date}.log")
 
     level_str = cfg.logger.level
     level = getattr(logging, level_str.upper(), logging.INFO)  # 将字符串转换为日志级别常量
@@ -52,5 +49,26 @@ def setup_logging(cfg, log_name='train'):
         file_handler.setFormatter(log_format)
         logger.addHandler(file_handler)
 
-    logger.info(f"{log_name} 日志已初始化，级别为 {logging.getLevelName(level)}。")
+    logger.info(f"日志已初始化，级别为 {logging.getLevelName(level)}。")
     return logger
+
+
+def get_output_dir(cfg):
+    """
+    创建唯一输出目录，若目录已存在则自动添加后缀
+
+    Args:
+        cfg: 配置对象，需包含 output_dir 和 name 属性
+
+    Returns:
+        str: 唯一输出目录路径
+    """
+    base_output_dir = os.path.join(cfg.output_dir, cfg.name)
+
+    suffix = 0
+    while os.path.exists(base_output_dir):
+        base_output_dir = f"{os.path.join(cfg.output_dir, cfg.name)}_{suffix}"
+        suffix += 1
+
+    os.makedirs(base_output_dir, exist_ok=True)  # 安全创建目录
+    return base_output_dir
