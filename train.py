@@ -27,6 +27,7 @@ from utils import setup_logging, load_config, get_environment_info, get_rank
 
 warnings.filterwarnings('ignore')
 
+
 def get_args_config():
     parser = argparse.ArgumentParser('SegChange')
     parser.add_argument('-c', '--config', type=str, required=True, help='The path of config file')
@@ -41,7 +42,7 @@ def get_args_config():
 def main():
     # cfg = load_config("./configs/config.yaml")
     cfg = get_args_config()
-    logger = setup_logging(cfg, log_name='train')
+    logger = setup_logging(cfg, log_name=cfg.name)
     logger.info('Train Log %s' % time.strftime("%c"))
     env_info = get_environment_info()
     logger.info(env_info)

@@ -37,7 +37,10 @@ def train(cfg, model, criterion, dataloader, optimizer, device, epoch):
             total_samples += images_a.size(0)
 
             # Calculate accuracy
-            preds = torch.round(torch.sigmoid(outputs)).squeeze(1)
+            if cfg.model.num_classes == 1:
+                preds = torch.round(torch.sigmoid(outputs)).squeeze(1)
+            else:
+                preds = torch.argmax(outputs, dim=1)
             correct = (preds == labels).sum().item()
             total_correct += correct
             total_pixels += labels.numel()
@@ -56,6 +59,7 @@ def train(cfg, model, criterion, dataloader, optimizer, device, epoch):
     }
 
     return stat, {'loss': epoch_loss, 'oa': epoch_oa}
+
 
 def evaluate(cfg, model, criterion, dataloader, device, epoch):
     model.eval()
@@ -76,7 +80,10 @@ def evaluate(cfg, model, criterion, dataloader, device, epoch):
             total_samples += images_a.size(0)
 
             # Store predictions and labels
-            preds = torch.round(torch.sigmoid(outputs)).squeeze(1).cpu().numpy()
+            if cfg.model.num_classes == 1:
+                preds = torch.round(torch.sigmoid(outputs)).squeeze(1).cpu().numpy()
+            else:
+                preds = torch.argmax(outputs, dim=1).cpu().numpy()
             labels = labels.cpu().numpy()
             all_preds.extend(preds.flatten())
             all_labels.extend(labels.flatten())
@@ -86,10 +93,19 @@ def evaluate(cfg, model, criterion, dataloader, device, epoch):
             })
 
     # Calculate evaluation metrics
-    precision = precision_score(all_labels, all_preds, zero_division=0)
-    recall = recall_score(all_labels, all_preds, zero_division=0)
-    f1 = f1_score(all_labels, all_preds, zero_division=0)
-    iou = jaccard_score(all_labels, all_preds)
-    oa = accuracy_score(all_labels, all_preds)
+    if cfg.model.num_classes == 1:
+        # 二分类指标
+        precision = precision_score(all_labels, all_preds, zero_division=0)
+        recall = recall_score(all_labels, all_preds, zero_division=0)
+        f1 = f1_score(all_labels, all_preds, zero_division=0)
+        iou = jaccard_score(all_labels, all_preds)
+        oa = accuracy_score(all_labels, all_preds)
+    else:
+        # 多分类指标（使用macro平均）
+        precision = precision_score(all_labels, all_preds, average='macro', zero_division=0)
+        recall = recall_score(all_labels, all_preds, average='macro', zero_division=0)
+        f1 = f1_score(all_labels, all_preds, average='macro', zero_division=0)
+        iou = jaccard_score(all_labels, all_preds, average='macro')
+        oa = accuracy_score(all_labels, all_preds)
 
     return precision, recall, f1, iou, oa
