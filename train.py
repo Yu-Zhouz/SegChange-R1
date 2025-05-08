@@ -198,9 +198,6 @@ def main():
             ]] = [metrics['loss'], metrics['precision'], metrics['recall'], metrics['f1'], metrics['iou'],
                   metrics['oa']]
 
-            # 每个 epoch 后都保存一次 CSV
-            results_df.to_csv(csv_file_path, index=False)
-
             # 从一开始就保存最好的模型
             if metrics['f1'] == np.max(f1_list):
                 checkpoint_best_path = os.path.join(ckpt_dir, 'best_f1.pth')
@@ -222,6 +219,8 @@ def main():
                     'lr_scheduler': lr_scheduler.state_dict(),
                     'loss': stat['loss'],
                 }, checkpoint_best_iou_path)
+        # 每个 epoch 后都保存一次 CSV
+        results_df.to_csv(csv_file_path, index=False)
 
     # 培训总时间
     total_time = time.time() - start_time
