@@ -15,9 +15,9 @@ from transformers import BertTokenizer, BertModel
 
 
 class TextEncoderLLM(nn.Module):
-    def __init__(self, model_name="microsoft/phi-1_5", freeze_text_encoder=True):
+    def __init__(self, model_name="microsoft/phi-1_5", device='cuda', freeze_text_encoder=True):
         super().__init__()
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = device
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
         # 设置pad_token，用于填充
         self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -71,9 +71,9 @@ class TextEncoderLLM(nn.Module):
 
 
 class TextEncoderBert(nn.Module):
-    def __init__(self, model_name="bert-base-uncased", freeze_text_encoder=True):
+    def __init__(self, model_name="bert-base-uncased", device='cuda', freeze_text_encoder=True):
         super().__init__()
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = device
         self.tokenizer = BertTokenizer.from_pretrained(model_name)
         self.bert = BertModel.from_pretrained(model_name).to(self.device)
 

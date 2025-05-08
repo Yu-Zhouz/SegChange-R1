@@ -9,7 +9,8 @@
 @Usage   :
 """
 from torch import nn
-from models import MaskGenerator, DualInputVisualEncoder, FeatureDiffModule, TextEncoderBert, TextEncoderLLM
+from models import MaskHead, DualInputVisualEncoder, FeatureDiffModule, TextEncoderBert, TextEncoderLLM, \
+    FPNFeatureFuser
 from models.losses import TotalLoss
 
 
@@ -20,47 +21,51 @@ class ChangeModel(nn.Module):
         self.device = self.cfg.device
         self.dual_encoder = DualInputVisualEncoder(cfg).to(self.device)
         self.feature_diff = FeatureDiffModule(in_channels_list=self.cfg.model.out_dims, diff_attention=self.cfg.model.diff_attention).to(self.device)
+        self.fpn = FPNFeatureFuser(in_channels=self.cfg.model.out_dims, use_token_connector=self.cfg.model.use_token_connector).to(self.device)
         self.lang_dim = 2048 if cfg.model.text_encoder_name == 'microsoft/phi-1_5' else 768
-        self.mask_generator = MaskGenerator(
-            in_channels=self.cfg.model.out_dims[-2],
-            feature_strides=[4, 8, 16, 32],
-            num_classes=self.cfg.model.num_classes,
+        self.use_text_description = cfg.model.use_text_description
+        self.mask_head = MaskHead(
+            vis_dim=self.cfg.model.out_dims[-1] if not self.cfg.model.use_token_connector else self.cfg.model.out_dims[-1]//2,
             lang_dim=self.lang_dim,
+            num_classes=self.cfg.model.num_classes,
             n_heads=8
         ).to(self.device)
-        self.use_text_description = cfg.model.use_text_description  # 新增参数
 
         if self.use_text_description:
             if cfg.model.text_encoder_name == "microsoft/phi-1_5":
-                self.llm = TextEncoderLLM(model_name=cfg.model.text_encoder_name,
-                                          freeze_text_encoder=cfg.model.freeze_text_encoder).to(self.device)
+                self.llm = TextEncoderLLM(model_name=cfg.model.text_encoder_name, device=self.device,
+                                          freeze_text_encoder=cfg.model.freeze_text_encoder)
             elif cfg.model.text_encoder_name == "bert-base-uncased":
-                self.llm = TextEncoderBert(model_name=cfg.model.text_encoder_name,
-                                           freeze_text_encoder=cfg.model.freeze_text_encoder).to(self.device)
+                self.llm = TextEncoderBert(model_name=cfg.model.text_encoder_name, device=self.device,
+                                           freeze_text_encoder=cfg.model.freeze_text_encoder)
             else:
                 raise NotImplementedError(f"Unsupported text encoder name: {cfg.model.text_encoder_name}")
 
     def forward(self, image1, image2, prompts=None):
         image1 = image1.to(self.device)
         image2 = image2.to(self.device)
+        B, _, H, W = image1.shape  # 获取原图尺寸
 
         multi_scale_bev_feats1, multi_scale_bev_feats2 = self.dual_encoder(image1, image2)
         multi_scale_diff_feats = self.feature_diff(multi_scale_bev_feats1, multi_scale_bev_feats2)
+        # 将原始图像尺寸传入 FPN Feature Fuser
+        merged_feat = self.fpn(multi_scale_diff_feats)
 
         if self.use_text_description and prompts is not None:
             description_embeddings, _ = self.llm(prompts)
         else:
             # 如果不使用文本描述，可以使用占位符或默认值
-            description_embeddings = torch.zeros((image1.size(0), 4, self.lang_dim), device=self.device)
+            description_embeddings = torch.zeros((B, 4, self.lang_dim), device=self.device)
 
-        mask = self.mask_generator(multi_scale_diff_feats, description_embeddings)
+        mask = self.mask_head(merged_feat, description_embeddings)
         return mask
 
     def to(self, device):
         self.device = device
         self.dual_encoder = self.dual_encoder.to(device)
         self.feature_diff = self.feature_diff.to(device)
-        self.mask_generator = self.mask_generator.to(device)
+        self.fpn = self.fpn.to(device)
+        self.mask_head = self.mask_head.to(device)
         if self.use_text_description:
             self.llm = self.llm.to(device)
         return self
@@ -73,6 +78,7 @@ def build_model(cfg, training=False):
 
     # 创建损失函数
     losses = TotalLoss(
+        num_classes=cfg.model.num_classes,
         weight_ce=cfg.loss.weight_ce,
         weight_dice=cfg.loss.weight_dice,
         weight_focal=cfg.loss.weight_focal,

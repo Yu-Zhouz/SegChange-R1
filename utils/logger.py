@@ -53,7 +53,7 @@ def setup_logging(cfg, log_dirs):
     return logger
 
 
-def get_output_dir(cfg):
+def get_output_dir(output_dir, name):
     """
     创建唯一输出目录，若目录已存在则自动添加后缀
 
@@ -61,13 +61,14 @@ def get_output_dir(cfg):
         cfg: 配置对象，需包含 output_dir 和 name 属性
 
     Returns:
-        str: 唯一输出目录路径
+        :param name:
+        :param output_dir:
     """
-    base_output_dir = os.path.join(cfg.output_dir, cfg.name)
+    base_output_dir = os.path.join(output_dir, name)
 
     suffix = 0
     while os.path.exists(base_output_dir):
-        base_output_dir = f"{os.path.join(cfg.output_dir, cfg.name)}_{suffix}"
+        base_output_dir = f"{os.path.join(output_dir, name)}_{suffix}"
         suffix += 1
 
     os.makedirs(base_output_dir, exist_ok=True)  # 安全创建目录

@@ -53,12 +53,7 @@ def train(cfg, model, criterion, dataloader, optimizer, device, epoch):
     epoch_loss = total_loss / total_samples
     epoch_oa = total_correct / total_pixels
 
-    stat = {
-        'loss': epoch_loss,
-        'oa': epoch_oa
-    }
-
-    return stat, {'loss': epoch_loss, 'oa': epoch_oa}
+    return {'loss': epoch_loss, 'oa': epoch_oa}
 
 
 def evaluate(cfg, model, criterion, dataloader, device, epoch):
@@ -93,6 +88,8 @@ def evaluate(cfg, model, criterion, dataloader, device, epoch):
             })
 
     # Calculate evaluation metrics
+    val_loss = total_loss / total_samples
+
     if cfg.model.num_classes == 1:
         # 二分类指标
         precision = precision_score(all_labels, all_preds, zero_division=0)
@@ -108,4 +105,13 @@ def evaluate(cfg, model, criterion, dataloader, device, epoch):
         iou = jaccard_score(all_labels, all_preds, average='macro')
         oa = accuracy_score(all_labels, all_preds)
 
-    return precision, recall, f1, iou, oa
+    metrics = {
+        'loss': val_loss,
+        'precision': precision,
+        'recall': recall,
+        'f1': f1,
+        'iou': iou,
+        'oa': oa
+    }
+
+    return metrics

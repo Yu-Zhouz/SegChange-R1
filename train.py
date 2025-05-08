@@ -9,6 +9,7 @@
 @Usage   :
 """
 import argparse
+import pandas as pd
 import os
 import pprint
 import numpy as np
@@ -23,7 +24,6 @@ from dataloader import build_dataset
 from engines import train, evaluate
 from models import build_model
 from utils import *
-
 
 warnings.filterwarnings('ignore')
 
@@ -42,7 +42,7 @@ def get_args_config():
 def main():
     # cfg = load_config("./configs/config.yaml")
     cfg = get_args_config()
-    output_dir = get_output_dir(cfg)
+    output_dir = get_output_dir(cfg.output_dir, cfg.name)
     logger = setup_logging(cfg, output_dir)
     logger.info('Train Log %s' % time.strftime("%c"))
     env_info = get_environment_info()
@@ -121,20 +121,33 @@ def main():
     os.makedirs(tensorboard_dir, exist_ok=True)
     writer = SummaryWriter(tensorboard_dir)
 
+    # 初始化 CSV 文件
+    csv_file_path = os.path.join(str(output_dir), 'result.csv')
+    # 初始化DataFrame用于缓存结果
+    results_df = pd.DataFrame(columns=[
+        'epoch', 'train_loss', 'train_oa',
+        'val_loss', 'val_precision', 'val_recall', 'val_f1', 'val_iou', 'val_oa'
+    ])
+
     step = 0
     # 开始训练
     for epoch in range(cfg.training.start_epoch, cfg.training.epochs):
         t1 = time.time()
 
-        stat, metric_logger = train(cfg, model, criterion, dataloader_train, optimizer, device, epoch)
+        stat = train(cfg, model, criterion, dataloader_train, optimizer, device, epoch)
         time.sleep(1)  # 避免tensorboard卡顿
         t2 = time.time()
         # 记录训练损失和OA
         if writer is not None:
-            logger.info("[ep %d][lr %.7f][%.2fs] Averaged stats: %s", epoch, optimizer.param_groups[0]['lr'], t2 - t1,
-                        metric_logger)
+            logger.info("[ep %d][lr %.7f][%.2fs] loss: %.4f, oa: %.4f", epoch, optimizer.param_groups[0]['lr'], t2 - t1,
+                        stat['loss'], stat['oa'])
             writer.add_scalar('loss/loss', stat['loss'], epoch)
             writer.add_scalar('metric/o_a', stat['oa'], epoch)
+
+        # 在训练完成后，更新训练指标
+        results_df.loc[epoch] = {'epoch': epoch, 'train_loss': stat['loss'], 'train_oa': stat['oa'],
+                                 'val_loss': '', 'val_precision': '', 'val_recall': '', 'val_f1': '', 'val_iou': '', 'val_oa': ''
+                                 }
 
         # 根据调度改变 lr
         lr_scheduler.step(stat['loss'])
@@ -154,30 +167,42 @@ def main():
         if epoch % cfg.training.eval_freq == 0 and epoch >= cfg.training.start_eval:
             t1 = time.time()
             # 假设 evaluate 函数返回 precision、recall、f1、iou、accuracy
-            precision, recall, f1, iou, oa = evaluate(cfg, model, criterion, dataloader_val, device, epoch)
+            metrics = evaluate(cfg, model, criterion, dataloader_val, device, epoch)
             t2 = time.time()
 
-            precision_list.append(precision)
-            recall_list.append(recall)
-            f1_list.append(f1)
-            iou_list.append(iou)
-            accuracy_list.append(oa)
+            precision_list.append(metrics['precision'])
+            recall_list.append(metrics['recall'])
+            f1_list.append(metrics['f1'])
+            iou_list.append(metrics['iou'])
+            accuracy_list.append(metrics['oa'])
             fps = len(dataloader_val.dataset) / (t2 - t1)
             # document the results of the assessment
-            logger.info("[ep %d][%.3fs][%.5ffps] precision: %.4f, recall: %.4f, f1: %.4f, iou: %.4f, oa: %.4f ---- @best f1: %.4f, @best iou: %.4f" % \
-                        (epoch, t2 - t1, fps, precision, recall, f1, iou, oa, np.max(f1_list), np.max(iou_list)))
+            logger.info(
+                "[ep %d][%.3fs][%.5ffps] loss: %.4f, precision: %.4f, recall: %.4f, f1: %.4f, iou: %.4f, oa: %.4f ---- @best f1: %.4f, @best iou: %.4f" % \
+                (epoch, t2 - t1, fps, metrics['loss'], metrics['precision'], metrics['recall'], metrics['f1'],
+                 metrics['iou'], metrics['oa'], np.max(f1_list), np.max(iou_list)))
 
             # recored the evaluation results
             if writer is not None:
-                writer.add_scalar('metric/precision', precision, step)
-                writer.add_scalar('metric/recall', recall, step)
-                writer.add_scalar('metric/f1', f1, step)
-                writer.add_scalar('metric/iou', iou, step)
-                writer.add_scalar('metric/oa', oa, step)
+                writer.add_scalar('metric/val_loss', metrics['loss'], step)
+                writer.add_scalar('metric/precision', metrics['precision'], step)
+                writer.add_scalar('metric/recall', metrics['recall'], step)
+                writer.add_scalar('metric/f1', metrics['f1'], step)
+                writer.add_scalar('metric/iou', metrics['iou'], step)
+                writer.add_scalar('metric/oa', metrics['oa'], step)
                 step += 1
 
+            # 更新验证指标
+            results_df.loc[epoch, [
+                'val_loss', 'val_precision', 'val_recall', 'val_f1', 'val_iou', 'val_oa'
+            ]] = [metrics['loss'], metrics['precision'], metrics['recall'], metrics['f1'], metrics['iou'],
+                  metrics['oa']]
+
+            # 每个 epoch 后都保存一次 CSV
+            results_df.to_csv(csv_file_path, index=False)
+
             # 从一开始就保存最好的模型
-            if f1 == np.max(f1_list):
+            if metrics['f1'] == np.max(f1_list):
                 checkpoint_best_path = os.path.join(ckpt_dir, 'best_f1.pth')
                 torch.save({
                     'epoch': epoch,
@@ -187,7 +212,7 @@ def main():
                     'lr_scheduler': lr_scheduler.state_dict(),
                     'loss': stat['loss'],
                 }, checkpoint_best_path)
-            if iou == np.max(iou_list):
+            if metrics['iou'] == np.max(iou_list):
                 checkpoint_best_iou_path = os.path.join(ckpt_dir, 'best_iou.pth')
                 torch.save({
                     'epoch': epoch,
@@ -197,6 +222,7 @@ def main():
                     'lr_scheduler': lr_scheduler.state_dict(),
                     'loss': stat['loss'],
                 }, checkpoint_best_iou_path)
+
     # 培训总时间
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
@@ -204,7 +230,8 @@ def main():
     logger.info(env_info)
     logger.info('Training time {}'.format(total_time_str))
     # 打印最好的指标
-    logger.info("Best F1: %.4f, Best IoU: %.4f, Best Accuracy: %.4f" % (np.max(f1_list), np.max(iou_list), np.max(accuracy_list)))
+    logger.info("Best F1: %.4f, Best IoU: %.4f, Best Accuracy: %.4f" % (
+    np.max(f1_list), np.max(iou_list), np.max(accuracy_list)))
     logger.info('Results saved to {}'.format(cfg.output_dir))
 
 

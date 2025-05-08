@@ -8,3 +8,4 @@ matplotlib
 tensorboardX
 scikit-learn
 einops
+pandas

@@ -14,7 +14,7 @@ import torch
 import numpy as np
 from torchvision import transforms
 from models.segchange import ChangeModel
-from utils import load_config
+from utils import load_config, get_output_dir
 import matplotlib
 matplotlib.use('Agg')  # 在导入pyplot前设置
 import matplotlib.pyplot as plt
@@ -138,11 +138,12 @@ def nested_tensor_from_tensor_list(tensor_list):
 
 def main():
     # 设置路径
-    model_path = "../work_dirs/train/checkpoints/best_iou.pth"
+    model_path = "../work_dirs/train_0/checkpoints/best_iou.pth"
     image1_path = "./images/1_a.png"
     image2_path = "./images/1_b.png"
     desc_text = ["Detection of building changes"]  # 示例文本
-    save_dir = "./output_fm"
+    output_dir = "./output_fm"
+    save_dir = get_output_dir(output_dir, "visualize")
     os.makedirs(save_dir, exist_ok=True)
 
     # 设备设置
