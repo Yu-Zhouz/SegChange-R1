@@ -38,9 +38,9 @@ if float(torchvision.__version__[2:4]) < 7:
     from torchvision.ops import _new_empty_tensor
     from torchvision.ops.misc import _output_size
 
-
 import yaml
 import pprint
+
 
 class Config:
     def __init__(self, **entries):
@@ -48,8 +48,19 @@ class Config:
             if isinstance(value, dict):
                 value = Config(**value)
             setattr(self, key, value)
+
     def __repr__(self):
         return pprint.pformat(self.__dict__)
+
+    def to_dict(self):
+        """递归转换 Config 对象为 dict"""
+        result = {}
+        for k, v in self.__dict__.items():
+            if isinstance(v, Config):
+                result[k] = v.to_dict()
+            else:
+                result[k] = v
+        return result
 
 def load_config(config_path):
     with open(config_path, 'r') as f:
@@ -368,6 +379,7 @@ def collate_fn(batch):
     batch = list(zip(*batch))
     batch[0] = nested_tensor_from_tensor_list(batch[0])
     return tuple(batch)
+
 
 def collate_fn_crowds(batch):
     # re-organize the batch

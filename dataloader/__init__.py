@@ -19,7 +19,7 @@ def build_dataset(cfg):
                                  collate_fn=collate_fn_building, num_workers=cfg.num_workers)
     # Log dataset scanning results
     logging.info("------------------------ preprocess dataset ------------------------")
-    logging.info("Data_path: %s", cfg.data.data_root)
+    logging.info("Data_path: %s", cfg.data_root)
     logging.info("Data offset:\n %s", cfg.data)
     logging.info(f"# Train {train_set.nSamples}, Val {val_set.nSamples}")
     return data_loader_train, data_loader_val

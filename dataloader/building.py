@@ -19,8 +19,7 @@ from torchvision import transforms
 
 
 class Building(Dataset):
-    def __init__(self, data_root, a_transform=None, b_transform=None, train=False, resizing=False,
-                 patch=False, flip=False):
+    def __init__(self, data_root, a_transform=None, b_transform=None, train=False, **kwargs):
         self.data_path = data_root
         self.train = train
         self.data_dir = os.path.join(self.data_path, 'train' if self.train else 'val')
@@ -50,9 +49,16 @@ class Building(Dataset):
         self.nSamples = len(self.img_list)
         self.a_transform = a_transform
         self.b_transform = b_transform
-        self.resizing = resizing
-        self.patch = patch
-        self.flip = flip
+
+        # 数据增强参数
+        self.color_jitter = kwargs.get('color_jitter', 0.0)
+        self.rotation_degree = kwargs.get('rotation_degree', 0)
+        self.gamma_range = kwargs.get('gamma_range', (1.0, 1.0))
+        self.affine_degree = kwargs.get('affine_degree', 0)
+        self.erase_prob = kwargs.get('erase_prob', 0.0)
+        self.erase_ratio = kwargs.get('erase_ratio', (0.02, 0.33))
+        self.blur_sigma = kwargs.get('blur_sigma', 0.0)
+
 
     def _load_prompts(self):
         """读取 prompts.txt 文件并存储提示信息"""
@@ -73,56 +79,148 @@ class Building(Dataset):
     def __getitem__(self, index):
         a_img_path = self.img_list[index]
         b_img_path, label_path = self.img_map[a_img_path]
-
-        # 获取图像名用于查找提示
         filename = os.path.basename(a_img_path)
 
+        # Step 1: 使用 OpenCV 读取图像，并转为 RGB 格式
         a_img = cv2.imread(a_img_path)
         a_img = cv2.cvtColor(a_img, cv2.COLOR_BGR2RGB)
         b_img = cv2.imread(b_img_path)
         b_img = cv2.cvtColor(b_img, cv2.COLOR_BGR2RGB)
         label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
-
-        # 将标注图像转换为二值化图像（0 和 1）
         label = (label > 0).astype(np.uint8)
 
-        # 获取对应的提示信息
+        # Step 2: 读取 prompt
         prompt = self.prompts.get(filename, "")
 
+        # Step 3: 数据增强（在 NumPy 阶段进行）
+        if self.train:
+            a_img, b_img, label = self.apply_transforms(a_img, b_img, label)
+
+        # Step 4: ToTensor 和 Normalize（转换为 Tensor）
         if self.a_transform is not None:
             a_img = self.a_transform(a_img)
         if self.b_transform is not None:
             b_img = self.b_transform(b_img)
 
-        if self.resizing and self.train:
-            scale_range = [0.7, 1.3]
-            min_size = min(a_img.shape[1:3])
-            scale = random.uniform(*scale_range)
-            if scale * min_size > 128:
-                a_img = torch.nn.functional.interpolate(a_img.unsqueeze(0), scale_factor=scale,
-                                                        mode='bilinear').squeeze(0)
-                b_img = torch.nn.functional.interpolate(b_img.unsqueeze(0), scale_factor=scale,
-                                                        mode='bilinear').squeeze(0)
-                label = torch.nn.functional.interpolate(
-                    torch.tensor(label, dtype=torch.float32).unsqueeze(0).unsqueeze(0), scale_factor=scale,
-                    mode='nearest').squeeze(0)
-
-        if self.patch and self.train:
-            a_img, b_img, label = random_crop(a_img, b_img, label)
-
-        if random.random() > 0.5 and self.flip:
-            a_img = torch.flip(a_img, [2])
-            b_img = torch.flip(b_img, [2])
-            label = torch.flip(label.clone().detach(), [1])
-
-        #归一化
-        a_img = torch.Tensor(a_img) / 255.0
-        b_img = torch.Tensor(b_img) / 255.0
+        # 确保输入数据为单精度浮点数
+        a_img = torch.tensor(a_img, dtype=torch.float32)
+        b_img = torch.tensor(b_img, dtype=torch.float32)
         label = torch.tensor(label, dtype=torch.int64).unsqueeze(0)
 
-        # 返回图像、标注和提示信息
         return a_img, b_img, prompt, label
 
+    def apply_transforms(self, a_img, b_img, label):
+        # 应用颜色扰动
+        if self.color_jitter > 0.0:
+            a_img = self.color_jitter_transform(a_img)
+            b_img = self.color_jitter_transform(b_img)
+
+        # 应用旋转
+        if self.rotation_degree > 0:
+            angle = random.uniform(-self.rotation_degree, self.rotation_degree)
+            a_img = self.rotate_image(a_img, angle)
+            b_img = self.rotate_image(b_img, angle)
+            label = self.rotate_image(label, angle, interpolation=cv2.INTER_NEAREST)
+
+        # 应用 Gamma 校正（光照变化）
+        if self.gamma_range[0] != self.gamma_range[1]:
+            gamma = random.uniform(self.gamma_range[0], self.gamma_range[1])
+            a_img = ((a_img / 255.0) ** gamma) * 255.0
+            b_img = ((b_img / 255.0) ** gamma) * 255.0
+
+        # 应用仿射变换
+        if self.affine_degree > 0:
+            a_img, b_img, label = self.affine_transform(a_img, b_img, label)
+
+        # 应用随机擦除
+        if self.erase_prob > 0.0:
+            a_img = self.random_erase(a_img, self.erase_prob, self.erase_ratio)
+            b_img = self.random_erase(b_img, self.erase_prob, self.erase_ratio)
+
+        # 应用高斯模糊
+        if self.blur_sigma > 0.0:
+            a_img = self.gaussian_blur(a_img, self.blur_sigma)
+            b_img = self.gaussian_blur(b_img, self.blur_sigma)
+
+        return a_img, b_img, label
+
+    def color_jitter_transform(self, img):
+        """颜色扰动"""
+        brightness = random.uniform(1 - self.color_jitter, 1 + self.color_jitter)
+        contrast = random.uniform(1 - self.color_jitter, 1 + self.color_jitter)
+        saturation = random.uniform(1 - self.color_jitter, 1 + self.color_jitter)
+        hue = random.uniform(-self.color_jitter, self.color_jitter)
+
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+        img[:, :, 1] = np.clip(img[:, :, 1] * saturation, 0, 255)
+        img[:, :, 2] = np.clip(img[:, :, 2] * brightness, 0, 255)
+        img = cv2.cvtColor(img, cv2.COLOR_HSV2RGB)
+
+        img = np.clip(img * contrast, 0, 255)
+        img = np.array(img, dtype=np.uint8)
+
+        return img
+
+    def rotate_image(self, img, angle, interpolation=cv2.INTER_LINEAR):
+        """旋转图像"""
+        (h, w) = img.shape[:2]
+        center = (w // 2, h // 2)
+        M = cv2.getRotationMatrix2D(center, angle, 1.0)
+        rotated = cv2.warpAffine(img, M, (w, h), flags=interpolation)
+        return rotated
+
+    def affine_transform(self, a_img, b_img, label):
+        """仿射变换"""
+        h, w = a_img.shape[:2]
+        src_points = np.float32([[0, 0], [w, 0], [0, h]])
+        dst_points = np.float32([
+            [random.uniform(0, w * 0.1), random.uniform(0, h * 0.1)],
+            [random.uniform(w * 0.9, w), random.uniform(0, h * 0.1)],
+            [random.uniform(0, w * 0.1), random.uniform(h * 0.9, h)]
+        ])
+        M = cv2.getAffineTransform(src_points, dst_points)
+        a_img = cv2.warpAffine(a_img, M, (w, h), flags=cv2.INTER_LINEAR)
+        b_img = cv2.warpAffine(b_img, M, (w, h), flags=cv2.INTER_LINEAR)
+        label = cv2.warpAffine(label, M, (w, h), flags=cv2.INTER_NEAREST)
+        return a_img, b_img, label
+
+    def random_erase(self, img, prob, ratio):
+        """随机擦除"""
+        if random.random() > prob:
+            return img
+
+        h, w = img.shape[:2]
+
+        # 检查图像是否足够大
+        if h < 4 or w < 4:  # 如果图像太小，跳过擦除
+            return img
+
+        aspect_ratio = random.uniform(ratio[0], ratio[1])
+        area = h * w
+        erase_area = random.uniform(0.02, 0.4) * area
+
+        erase_h = int(np.sqrt(erase_area * aspect_ratio))
+        erase_w = int(np.sqrt(erase_area / aspect_ratio))
+
+        # 防止裁剪超出图像范围
+        if erase_h >= h or erase_w >= w:
+            return img
+
+        x1 = random.randint(0, w - erase_w)
+        y1 = random.randint(0, h - erase_h)
+        x2 = x1 + erase_w
+        y2 = y1 + erase_h
+
+        img[y1:y2, x1:x2] = np.random.randint(0, 256, size=(erase_h, erase_w, 3), dtype=np.uint8)
+        return img
+
+    def gaussian_blur(self, img, sigma):
+        """高斯模糊"""
+        kernel_size = int(2 * 2 * sigma) + 1  # 根据 sigma 计算核大小
+        if kernel_size % 2 == 0:
+            kernel_size += 1
+        img = cv2.GaussianBlur(img, (kernel_size, kernel_size), sigma)
+        return img
 
 def sort_filenames_numerically(filenames):
     def numeric_key(filename):
@@ -133,24 +231,34 @@ def sort_filenames_numerically(filenames):
 
 
 def random_crop(img_a, img_b, label):
-    half_h, half_w = 128, 128
-    img_a_h, img_a_w = img_a.shape[0], img_a.shape[1]
+    target_h, target_w = 512, 512  # 设置目标尺寸
+    img_a_h, img_a_w = img_a.shape[:2]
 
     # 检查图像尺寸是否满足裁剪要求
-    if img_a_h < half_h or img_a_w < half_w:
-        return img_a, img_b, label
+    if img_a_h < target_h or img_a_w < target_w:
+        # 如果图像太小，进行填充
+        new_img_a = np.zeros((target_h, target_w, 3), dtype=np.uint8)
+        new_img_b = np.zeros((target_h, target_w, 3), dtype=np.uint8)
+        new_label = np.zeros((target_h, target_w), dtype=np.uint8)
+        new_img_a[:img_a_h, :img_a_w] = img_a
+        new_img_b[:img_a_h, :img_a_w] = img_b
+        new_label[:img_a_h, :img_a_w] = label
+        img_a, img_b, label = new_img_a, new_img_b, new_label
+    else:
+        start_h = random.randint(0, img_a_h - target_h)
+        start_w = random.randint(0, img_a_w - target_w)
+        img_a = img_a[start_h:start_h + target_h, start_w:start_w + target_w]
+        img_b = img_b[start_h:start_h + target_h, start_w:start_w + target_w]
+        label = label[start_h:start_h + target_h, start_w:start_w + target_w]
 
-    start_h = random.randint(0, img_a_h - half_h)
-    start_w = random.randint(0, img_a_w - half_w)
-    img_a = img_a[start_h:start_h + half_h, start_w:start_w + half_w]
-    img_b = img_b[start_h:start_h + half_h, start_w:start_w + half_w]
-    label = label[start_h:start_h + half_h, start_w:start_w + half_w]
     return img_a, img_b, label
 
 
 if __name__ == '__main__':
-    data_path = '../data/change'
+    from utils import load_config
 
+    cfg = load_config("../configs/config.yaml")
+    cfg.data_root = '../data/change'
     a_transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
@@ -161,9 +269,12 @@ if __name__ == '__main__':
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
-    train_dataset = Building(data_path, a_transform=a_transform, b_transform=b_transform, train=True,
-                             resizing=False, patch=False, flip=False)
-    val_dataset = Building(data_path, a_transform=a_transform, b_transform=b_transform, train=False)
+    train_dataset = Building(cfg.data_root,
+                             a_transform=a_transform,
+                             b_transform=b_transform,
+                             train=True,
+                             **cfg.data.to_dict())
+    val_dataset = Building(cfg.data_root, a_transform=a_transform, b_transform=b_transform, train=False)
 
     print('训练集样本数：', len(train_dataset))
     print('测试集样本数：', len(val_dataset))

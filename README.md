@@ -1,7 +1,17 @@
 # SegChange-R1
 
+## 项目介绍
 
-## 环境搭建
+## 系统要求
+
+- Python 3.12
+- CUDA
+- PyTorch
+- HuggingFace
+- 稳定的网络连接
+- 高质量代理IP（重要）
+
+## 安装步骤
 
 ### 1. 创建虚拟环境
 
@@ -26,9 +36,9 @@ export HF_ENDPOINT="https://hf-mirror.com"
 source ~/.bashrc
 ```
 
-## 数据集
+## 数据集介绍
 
-数据集的结构为：
+数据集的结构如下：
 ```text
 data
     |--train
@@ -60,9 +70,10 @@ python train.py -c ./configs/config.yaml
 python test.py -c ./configs/config.yaml
 ```
 
+## 贡献
 
-## 参考
-https://blog.csdn.net/weixin_45679938/article/details/142030784
-https://www.arxiv.org/pdf/2503.11070
-https://www.arxiv.org/abs/2503.16825
-https://zhuanlan.zhihu.com/p/627646794
+欢迎提交问题和代码改进。请确保遵循项目的代码风格和贡献指南。
+
+## 许可证
+
+本项目使用 [MIT许可证](LICENSE)

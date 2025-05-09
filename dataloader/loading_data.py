@@ -22,6 +22,7 @@ class DeNormalize(object):
             t.mul_(s).add_(m)
         return tensor
 
+
 def loading_data(cfg):
     if cfg.data.transform:
         a_transform = transforms.Compose([
@@ -37,24 +38,30 @@ def loading_data(cfg):
         a_transform = None
         b_transform = None
 
-    train_dataset = Building(cfg.data.data_root, a_transform=a_transform, b_transform=b_transform, train=True,
-                             resizing=cfg.data.resizing, patch=cfg.data.patch, flip=cfg.data.flip)
-    val_dataset = Building(cfg.data.data_root, a_transform=a_transform, b_transform=b_transform, train=False)
+    train_dataset = Building(cfg.data_root,
+                             a_transform=a_transform,
+                             b_transform=b_transform,
+                             train=True,
+                             **cfg.data.to_dict())
+    val_dataset = Building(cfg.data_root, a_transform=a_transform, b_transform=b_transform, train=False)
     return train_dataset, val_dataset
 
 
 # 测试
 if __name__ == '__main__':
     from utils import load_config
+
     cfg = load_config("../configs/config.yaml")
-    cfg.data.data_root = '../data'
+    cfg.data_root = '../data/change'
     train_dataset, val_dataset = loading_data(cfg)
 
     print('训练集样本数：', len(train_dataset))
     print('测试集样本数：', len(val_dataset))
 
     img_a, img_b, prompt, label = train_dataset[0]
-    print('训练集第1个样本a图像形状：', img_a.shape, 'b图像形状：', img_b.shape, '提示：', prompt, '标注形状：', label.shape)
+    print('训练集第1个样本a图像形状：', img_a.shape, 'b图像形状：', img_b.shape, '提示：', prompt, '标注形状：',
+          label.shape)
 
     img_a, img_b, prompt, label = val_dataset[0]
-    print('测试集第1个样本a图像形状：', img_a.shape, 'b图像形状：', img_b.shape, '提示：', prompt, '标注形状：', label.shape)
+    print('测试集第1个样本a图像形状：', img_a.shape, 'b图像形状：', img_b.shape, '提示：', prompt, '标注形状：',
+          label.shape)

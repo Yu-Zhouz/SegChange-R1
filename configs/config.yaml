@@ -5,13 +5,17 @@ output_dir: ./work_dirs
 num_workers: 2
 frozen_weights: null
 resume: null
+data_root: ./data/change
 
 data:
-  data_root: ./data/change
-  transform: True
-  resizing: False
-  patch: False
-  flip: False
+  transform: true
+  color_jitter: 0
+  rotation_degree: 0
+  gamma_range: [1.0, 1.0]
+  affine_degree: 0
+  erase_prob: 0
+  erase_ratio: [0, 0]
+  blur_sigma: 0
 
 model:
   num_classes: 1
@@ -27,12 +31,12 @@ model:
   freeze_text_encoder: True # 冻结模型参数
 
 loss:
-  weight_ce: 1.2  # 分类损失函数
-  weight_dice: 1.0  # 预测与真实标签之间的重叠度
-  weight_focal: 1.0  # 用于解决分类问题中的类别不平衡问题
+  weight_ce: 1.2  # 分类任务基础损失
+  weight_dice: 1.0  # 提升边界分割精
+  weight_focal: 1.0  # 缓解类别不平衡
   alpha: 0.5  # 平衡正负样本的比例。
   gamma: 3.0  # 聚焦参数，控制简单样本的下降速率。
-  weight_bcl: 0.2  # 衡量正负样本对之间的差异
+  weight_bcl: 0.2  # 增强特征区分度
 
 logger:
   log_name: 'Seg_log'
@@ -43,7 +47,7 @@ training:
   epochs: 200
   lr: 0.0001
   lr_backbone: 0.00001
-  lr_drop: 200
+  lr_drop: 100
   batch_size: 2
   eval_freq: 1
   start_eval: 1
