@@ -50,7 +50,7 @@ def main():
     # backup the arguments
     logger.info('Running with config:')
     logger.info(pprint.pformat(cfg.__dict__))  # 修改这里以递归打印 Config
-    device = torch.device('cuda')
+    device = cfg.device
     # fix the seed for reproducibility
     seed = cfg.seed + get_rank()
     torch.manual_seed(seed)
@@ -81,8 +81,13 @@ def main():
     ]
 
     optimizer = torch.optim.Adam(param_dicts, lr=cfg.training.lr)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, cfg.training.lr_drop)
-    # lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=10, verbose=True)
+    lr_scheduler = None
+    # 配置学习率调度器
+    if cfg.training.scheduler == 'step':
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=cfg.training.lr_drop, gamma=0.1)
+    elif cfg.training.scheduler == 'plateau':
+        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10, verbose=True)
+
     # 打印优化器详细信息
     optimizer_info = f"optimizer: Adam(lr={cfg.training.lr})"
     optimizer_info += " with parameter groups "
@@ -149,8 +154,9 @@ def main():
                                  'val_loss': '', 'val_precision': '', 'val_recall': '', 'val_f1': '', 'val_iou': '', 'val_oa': ''
                                  }
 
-        # 根据调度改变 lr
-        lr_scheduler.step(stat['loss'])
+        # 调整学习率
+        if cfg.training.scheduler == 'step':
+            lr_scheduler.step()
         # 每隔一纪元保存最新权重
         ckpt_dir = os.path.join(str(output_dir), 'checkpoints')
         os.makedirs(ckpt_dir, exist_ok=True)
@@ -169,6 +175,8 @@ def main():
             # 假设 evaluate 函数返回 precision、recall、f1、iou、accuracy
             metrics = evaluate(cfg, model, criterion, dataloader_val, device, epoch)
             t2 = time.time()
+            if cfg.training.scheduler == 'plateau':
+                lr_scheduler.step(metrics['loss'])  # 根据验证损失调整学习率
 
             precision_list.append(metrics['precision'])
             recall_list.append(metrics['recall'])

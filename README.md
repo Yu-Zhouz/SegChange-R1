@@ -41,22 +41,22 @@ source ~/.bashrc
 
 数据集的结构如下：
 ```text
-data
-    |--train
-        |--A
-        |--B
-        |--label
-        |--prompts.txt
-    |--val
-        |--A
-        |--B
-        |--label
-        |--prompts.txt
-    |___test
-        |--A
-        |--B
-        |--label
-        |--prompts.txt
+data/
+  ├── train/
+  │   ├── A/                  # 第一时相训练图像
+  │   ├── B/                  # 第二时相训练图像
+  │   ├── label/              # 训练标签（变化掩码）
+  │   └── prompts.txt         # 训练集文本描述提示
+  ├── val/
+  │   ├── A/                  # 第一时相验证图像
+  │   ├── B/                  # 第二时相验证图像
+  │   ├── label/              # 验证标签（变化掩码）
+  │   └── prompts.txt         # 验证集文本描述提示
+  └── test/
+      ├── A/                  # 第一时相测试图像
+      ├── B/                  # 第二时相测试图像
+      ├── label/              # 测试标签（变化掩码）
+      └── prompts.txt         # 测试集文本描述提示
 ```
 
 ## 训练
@@ -78,3 +78,10 @@ python test.py -c ./configs/config.yaml
 ## 许可证
 
 本项目使用 [MIT许可证](LICENSE)
+
+
+## 参考
+https://blog.csdn.net/weixin_45679938/article/details/142030784
+https://www.arxiv.org/pdf/2503.11070
+https://www.arxiv.org/abs/2503.16825
+https://zhuanlan.zhihu.com/p/627646794

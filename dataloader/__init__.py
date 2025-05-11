@@ -3,6 +3,7 @@ from dataloader.loading_data import loading_data
 from utils import collate_fn_building
 from torch.utils.data import DataLoader
 import logging
+from .building import Building
 
 
 def build_dataset(cfg):

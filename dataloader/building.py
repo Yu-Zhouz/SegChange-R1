@@ -19,10 +19,14 @@ from torchvision import transforms
 
 
 class Building(Dataset):
-    def __init__(self, data_root, a_transform=None, b_transform=None, train=False, **kwargs):
+    def __init__(self, data_root, a_transform=None, b_transform=None, train=False, test=False, **kwargs):
         self.data_path = data_root
         self.train = train
-        self.data_dir = os.path.join(self.data_path, 'train' if self.train else 'val')
+        self.test = test
+        if self.test:
+            self.data_dir = self.data_path  # 测试数据路径由外部指定
+        else:
+            self.data_dir = os.path.join(self.data_path, 'train' if self.train else 'val')
         self.a_dir = os.path.join(self.data_dir, 'A')
         self.b_dir = os.path.join(self.data_dir, 'B')
         self.labels_dir = os.path.join(self.data_dir, 'label')
@@ -102,9 +106,8 @@ class Building(Dataset):
         if self.b_transform is not None:
             b_img = self.b_transform(b_img)
 
-        # 确保输入数据为单精度浮点数
-        a_img = torch.tensor(a_img, dtype=torch.float32)
-        b_img = torch.tensor(b_img, dtype=torch.float32)
+        a_img = a_img.float()
+        b_img = b_img.float()
         label = torch.tensor(label, dtype=torch.int64).unsqueeze(0)
 
         return a_img, b_img, prompt, label
@@ -259,6 +262,7 @@ if __name__ == '__main__':
 
     cfg = load_config("../configs/config.yaml")
     cfg.data_root = '../data/change'
+    cfg.test.test_img_dirs = '../data/change/val'
     a_transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
@@ -276,11 +280,22 @@ if __name__ == '__main__':
                              **cfg.data.to_dict())
     val_dataset = Building(cfg.data_root, a_transform=a_transform, b_transform=b_transform, train=False)
 
+    test_dataset = Building(
+        data_root=cfg.test.test_img_dirs,
+        a_transform=a_transform,
+        b_transform=b_transform,
+        test=True
+    )
+
     print('训练集样本数：', len(train_dataset))
     print('测试集样本数：', len(val_dataset))
+    print('测试集样本数：', len(test_dataset))
 
     img_a, img_b, prompt, label = train_dataset[0]
     print('训练集第1个样本a图像形状：', img_a.shape, 'b图像形状：', img_b.shape, '提示：', prompt, '标注形状：', label.shape)
 
     img_a, img_b, prompt, label = val_dataset[0]
+    print('验证集第1个样本a图像形状：', img_a.shape, 'b图像形状：', img_b.shape, '提示：', prompt, '标注形状：', label.shape)
+
+    img_a, img_b, prompt, label = test_dataset[0]
     print('测试集第1个样本a图像形状：', img_a.shape, 'b图像形状：', img_b.shape, '提示：', prompt, '标注形状：', label.shape)

@@ -31,12 +31,12 @@ model:
   freeze_text_encoder: True # 冻结模型参数
 
 loss:
-  weight_ce: 1.2  # 分类任务基础损失
-  weight_dice: 1.0  # 提升边界分割精
-  weight_focal: 1.0  # 缓解类别不平衡
-  alpha: 0.5  # 平衡正负样本的比例。
-  gamma: 3.0  # 聚焦参数，控制简单样本的下降速率。
-  weight_bcl: 0.2  # 增强特征区分度
+  weight_ce: 1.0  # 分类任务基础损失
+  weight_dice: 1.5  # 提升边界分割精度
+  weight_focal: 1.5  # 缓解类别不平衡
+  alpha: 0.6  # 平衡正负样本的比例
+  gamma: 2.0  # 聚焦参数，控制简单样本的下降速率
+  weight_bcl: 0.3  # 增强特征区分度
 
 logger:
   log_name: 'Seg_log'
@@ -45,13 +45,20 @@ logger:
 training:
   start_epoch: 1
   epochs: 200
+  scheduler: 'step'  # [step, plateau]
   lr: 0.0001
   lr_backbone: 0.00001
-  lr_drop: 100
+  lr_drop: 200
   batch_size: 2
   eval_freq: 1
   start_eval: 1
 
 test:
+  test_img_dirs: './data/change/val'
   batch_size: 1
-  weight_path: "./work_dirs/best_f1.pth"
+  device: 'cuda:1'
+  save_dir: "./work_dirs"
+  name: "test"
+  weight_path: "./work_dirs/train_1/checkpoints/best_iou.pth"
+  show: True
+  show_overlay: False
