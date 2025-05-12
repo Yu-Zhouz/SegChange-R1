@@ -43,7 +43,7 @@ def train(cfg, model, criterion, dataloader, optimizer, device, epoch):
 
             # Calculate accuracy
             if cfg.model.num_classes == 1:
-                preds = torch.round(torch.sigmoid(outputs)).squeeze(1)
+                preds = (torch.sigmoid(outputs) > cfg.threshold).float().squeeze(1)
             else:
                 preds = torch.argmax(outputs, dim=1)
             correct = (preds == labels).sum().item()
@@ -81,7 +81,7 @@ def evaluate(cfg, model, criterion, dataloader, device, epoch):
 
             # Store predictions and labels
             if cfg.model.num_classes == 1:
-                preds = torch.round(torch.sigmoid(outputs)).squeeze(1).cpu().numpy()
+                preds = (torch.sigmoid(outputs) > cfg.threshold).float().squeeze(1).cpu().numpy()
             else:
                 preds = torch.argmax(outputs, dim=1).cpu().numpy()
             labels = labels.cpu().numpy()
@@ -137,7 +137,7 @@ def evaluate_model(cfg, model, dataloader, device, output_dir):
 
             # Store predictions and labels
             if cfg.model.num_classes == 1:
-                preds = torch.round(torch.sigmoid(outputs)).squeeze(1).cpu().numpy()
+                preds = (torch.sigmoid(outputs) > cfg.threshold).float().squeeze(1).cpu().numpy()
             else:
                 preds = torch.argmax(outputs, dim=1).cpu().numpy()
             labels_np = labels.cpu().numpy()

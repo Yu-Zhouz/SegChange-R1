@@ -52,10 +52,12 @@ training:
   batch_size: 2
   eval_freq: 1
   start_eval: 1
+  threshold: 0.5
 
 test:
   test_img_dirs: './data/change/val'
   batch_size: 1
+  threshold: 0.5
   device: 'cuda:1'
   save_dir: "./work_dirs"
   name: "test"
