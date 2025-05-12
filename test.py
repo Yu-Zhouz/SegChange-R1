@@ -59,7 +59,8 @@ def main():
         data_root=cfg.test.test_img_dirs,
         a_transform=transform,
         b_transform=transform,
-        test=True
+        test=True,
+        data_format=cfg.data_format,
     )
 
     test_loader = DataLoader(test_dataset, batch_size=cfg.test.batch_size, shuffle=False)

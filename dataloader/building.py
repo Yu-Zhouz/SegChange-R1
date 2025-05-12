@@ -19,31 +19,68 @@ from torchvision import transforms
 
 
 class Building(Dataset):
-    def __init__(self, data_root, a_transform=None, b_transform=None, train=False, test=False, **kwargs):
+    def __init__(self, data_root, a_transform=None, b_transform=None, train=False, test=False, data_format="default",
+                 **kwargs):
         self.data_path = data_root
         self.train = train
         self.test = test
-        if self.test:
-            self.data_dir = self.data_path  # 测试数据路径由外部指定
+        self.data_format = data_format  # 控制数据集格式
+
+        # 根据数据集格式构建数据目录
+        if self.data_format == "default":
+            if self.test:
+                self.data_dir = self.data_path  # 测试数据路径由外部指定
+            else:
+                self.data_dir = os.path.join(self.data_path, 'train' if self.train else 'val')
+            self.a_dir = os.path.join(self.data_dir, 'A')
+            self.b_dir = os.path.join(self.data_dir, 'B')
+            self.labels_dir = os.path.join(self.data_dir, 'label')
+            self.prompts_path = os.path.join(self.data_dir, 'prompts.txt')
+        elif self.data_format == "custom":
+            self.data_dir = self.data_path
+            self.a_dir = os.path.join(self.data_path, 'A')
+            self.b_dir = os.path.join(self.data_path, 'B')
+            self.labels_dir = os.path.join(self.data_path, 'label')
+            self.prompts_path = os.path.join(self.data_path, 'prompts.txt')
         else:
-            self.data_dir = os.path.join(self.data_path, 'train' if self.train else 'val')
-        self.a_dir = os.path.join(self.data_dir, 'A')
-        self.b_dir = os.path.join(self.data_dir, 'B')
-        self.labels_dir = os.path.join(self.data_dir, 'label')
-        self.prompts_path = os.path.join(self.data_dir, 'prompts.txt')
+            raise ValueError(f"不支持的数据集格式：{self.data_format}")
 
         self.img_map = {}
         self.img_list = []
         self.prompts = {}  # 用于存储每个图像的提示信息
 
-        a_img_paths = [filename for filename in os.listdir(self.a_dir) if filename.endswith('.png')]
-        for filename in a_img_paths:
-            a_img_path = os.path.join(self.a_dir, filename)
-            b_img_path = os.path.join(self.b_dir, filename)
-            label_path = os.path.join(self.labels_dir, filename)
-            if os.path.isfile(a_img_path) and os.path.isfile(b_img_path) and os.path.isfile(label_path):
-                self.img_map[a_img_path] = (b_img_path, label_path)
-                self.img_list.append(a_img_path)
+        # 根据数据集格式加载图像路径
+        if self.data_format == "default":
+            a_img_paths = [filename for filename in os.listdir(self.a_dir) if filename.endswith('.png')]
+            for filename in a_img_paths:
+                a_img_path = os.path.join(self.a_dir, filename)
+                b_img_path = os.path.join(self.b_dir, filename)
+                label_path = os.path.join(self.labels_dir, filename)
+                if os.path.isfile(a_img_path) and os.path.isfile(b_img_path) and os.path.isfile(label_path):
+                    self.img_map[a_img_path] = (b_img_path, label_path)
+                    self.img_list.append(a_img_path)
+        elif self.data_format == "custom":
+            # 从对应的txt文件中读取图像路径
+            if self.test:
+                list_file = os.path.join(self.data_path, 'list', 'test.txt')
+            elif self.train:
+                list_file = os.path.join(self.data_path, 'list', 'train.txt')
+            else:
+                list_file = os.path.join(self.data_path, 'list', 'val.txt')
+
+            if not os.path.exists(list_file):
+                raise FileNotFoundError(f"未找到列表文件：{list_file}")
+
+            with open(list_file, 'r') as f:
+                for line in f:
+                    filename = line.strip()
+                    if filename:
+                        a_img_path = os.path.join(self.a_dir, filename)
+                        b_img_path = os.path.join(self.b_dir, filename)
+                        label_path = os.path.join(self.labels_dir, filename)
+                        if os.path.isfile(a_img_path) and os.path.isfile(b_img_path) and os.path.isfile(label_path):
+                            self.img_map[a_img_path] = (b_img_path, label_path)
+                            self.img_list.append(a_img_path)
 
         # 读取 prompts.txt 文件
         self._load_prompts()

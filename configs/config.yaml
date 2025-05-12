@@ -5,7 +5,8 @@ output_dir: ./work_dirs
 num_workers: 2
 frozen_weights: null
 resume: null
-data_root: ./data/change
+data_root: ./data
+data_format: 'custom'  # [default, custom]
 
 data:
   transform: true
@@ -49,7 +50,7 @@ training:
   lr: 0.0001
   lr_backbone: 0.00001
   lr_drop: 200
-  batch_size: 2
+  batch_size: 4
   eval_freq: 1
   start_eval: 1
   threshold: 0.5

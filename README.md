@@ -93,10 +93,3 @@ python test.py -c ./configs/config.yaml
 ## 许可证
 
 本项目使用 [MIT许可证](LICENSE)
-
-
-## 参考
-https://blog.csdn.net/weixin_45679938/article/details/142030784
-https://www.arxiv.org/pdf/2503.11070
-https://www.arxiv.org/abs/2503.16825
-https://zhuanlan.zhihu.com/p/627646794
