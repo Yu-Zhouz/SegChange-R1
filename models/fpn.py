@@ -71,9 +71,12 @@ if __name__ == '__main__':
                          torch.randn(2, 256, 32, 32).to('cuda'),
                          torch.randn(2, 256, 16, 16).to('cuda')]
     fpn_feature_fuser = FPNFeatureFuser(in_channels=[256, 256, 256, 256]).to('cuda')
+    import time
+    start = time.time()
     fpn_feats = fpn_feature_fuser(multi_scale_feats)
+    last = time.time()
     print(fpn_feats.shape)
 
     from thop import profile
     flops, params = profile(fpn_feature_fuser, inputs=(multi_scale_feats,))
-    print(f'flops: {flops / 1e9}G, params: {params / 1e6}M')
+    print(f"encoder FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {(last - start):.2f} s")

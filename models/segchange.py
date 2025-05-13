@@ -9,6 +9,7 @@
 @Usage   :
 """
 from torch import nn
+import torch
 from models import MaskHead, DualInputVisualEncoder, FeatureDiffModule, TextEncoderBert, TextEncoderLLM, \
     FPNFeatureFuser
 from models.losses import TotalLoss
@@ -24,6 +25,7 @@ class ChangeModel(nn.Module):
         self.fpn = FPNFeatureFuser(in_channels=self.cfg.model.out_dims, use_token_connector=self.cfg.model.use_token_connector).to(self.device)
         self.lang_dim = 2048 if cfg.model.text_encoder_name == 'microsoft/phi-1_5' else 768
         self.use_text_description = cfg.model.use_text_description
+        self.desc_embs = cfg.model.desc_embs  # 预训练文本嵌入路径
         self.mask_head = MaskHead(
             vis_dim=self.cfg.model.out_dims[-1] if not self.cfg.model.use_token_connector else self.cfg.model.out_dims[-1]//2,
             lang_dim=self.lang_dim,
@@ -31,7 +33,7 @@ class ChangeModel(nn.Module):
             n_heads=8
         ).to(self.device)
 
-        if self.use_text_description:
+        if self.use_text_description and self.desc_embs is None:
             if cfg.model.text_encoder_name == "microsoft/phi-1_5":
                 self.llm = TextEncoderLLM(model_name=cfg.model.text_encoder_name, device=self.device,
                                           freeze_text_encoder=cfg.model.freeze_text_encoder)
@@ -51,8 +53,16 @@ class ChangeModel(nn.Module):
         # 将原始图像尺寸传入 FPN Feature Fuser
         merged_feat = self.fpn(multi_scale_diff_feats)
 
-        if self.use_text_description and prompts is not None:
-            description_embeddings, _ = self.llm(prompts)
+        if self.use_text_description:
+            if self.desc_embs is not None:
+                # 加载预计算的描述嵌入调整批次
+                description_embeddings = torch.load(self.desc_embs).to(self.device).expand(B, -1, -1)  # 形状: [B, num_descriptions, lang_dim]
+            elif prompts is not None:
+                # 实时通过 LLM 生成描述嵌入
+                description_embeddings, _ = self.llm(prompts)
+            else:
+                # 如果不使用文本描述，可以使用占位符或默认值
+                description_embeddings = torch.zeros((B, 4, self.lang_dim), device=self.device)
         else:
             # 如果不使用文本描述，可以使用占位符或默认值
             description_embeddings = torch.zeros((B, 4, self.lang_dim), device=self.device)
@@ -66,7 +76,7 @@ class ChangeModel(nn.Module):
         self.feature_diff = self.feature_diff.to(device)
         self.fpn = self.fpn.to(device)
         self.mask_head = self.mask_head.to(device)
-        if self.use_text_description:
+        if self.use_text_description and self.desc_embs is None:
             self.llm = self.llm.to(device)
         return self
 
@@ -96,19 +106,48 @@ if __name__ == '__main__':
     from utils import load_config
 
     cfg = load_config("../configs/config.yaml")
-    model = ChangeModel(cfg)
-    image1 = torch.randn(2, 3, 512, 512).to('cuda')
-    image2 = torch.randn(2, 3, 512, 512).to('cuda')
-    prompts = ["Detection of building changes", "This is another test prompt."]
-    mask = model(image1, image2, prompts).to('cuda')
-    print(mask.shape)
-    print(mask)
+    device = cfg.device  # 从配置中获取设备，例如 'cuda' 或 'cpu'
+    cfg.model.backbone_name = 'swin_base_patch4_window7_224'
+    cfg.model.desc_embs = "../weights/embeddings.pt"
+    model = ChangeModel(cfg).to(device)  # 将整个模型移动到指定设备
 
-    # 打印模型的参数量
-    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Total parameters: {total_params}")
+    # 输入张量也移动到相同设备
+    image1 = torch.randn(2, 3, 512, 512).to(device)
+    image2 = torch.randn(2, 3, 512, 512).to(device)
+    prompts = ["Detection of building changes"]
 
     from thop import profile
 
-    flops, params = profile(model, inputs=(image1, image2, prompts))
-    print(f"FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+    # 计算每个模块的FLOPs
+    with torch.no_grad():  # 禁用梯度计算
+        # Dual Encoder
+        flops, params = profile(model.dual_encoder, inputs=(image1, image2), verbose=False)
+        print(f"Dual Encoder - FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+
+        # Feature Diff
+        multi_scale_bev_feats1, multi_scale_bev_feats2 = model.dual_encoder(image1, image2)
+        flops, params = profile(model.feature_diff, inputs=(multi_scale_bev_feats1, multi_scale_bev_feats2),
+                                verbose=False)
+        print(f"Feature Diff - FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+
+        # FPN
+        multi_scale_diff_feats = model.feature_diff(multi_scale_bev_feats1, multi_scale_bev_feats2)
+        flops, params = profile(model.fpn, inputs=(multi_scale_diff_feats,), verbose=False)
+        print(f"FPN - FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+
+        # Mask Head
+        merged_feat = model.fpn(multi_scale_diff_feats)
+        if model.use_text_description:
+            description_embeddings = torch.load(model.desc_embs).to(device).expand(2, -1, -1)
+        else:
+            description_embeddings = torch.zeros((2, 4, model.lang_dim), device=device)
+        flops, params = profile(model.mask_head, inputs=(merged_feat, description_embeddings), verbose=False)
+        print(f"Mask Head - FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+
+    mask = model(image1, image2, prompts).to(device)
+    print(mask.shape)
+    print(mask)
+
+    # 总FLOPs
+    total_flops, total_params = profile(model, inputs=(image1, image2, prompts), verbose=False)
+    print(f"Total Model - FLOPs: {total_flops / 1e9:.2f} G, Params: {total_params / 1e6:.2f} M")

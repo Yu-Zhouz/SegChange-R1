@@ -99,9 +99,6 @@ def main():
     # 用于训练的采样器
     dataloader_train, dataloader_val = build_dataset(cfg=cfg)
 
-    if cfg.frozen_weights is not None:
-        checkpoint = torch.load(cfg.frozen_weights, map_location='cpu')
-        model_without_ddp.detr.load_state_dict(checkpoint['model'])
     # 如果存在，则恢复权重和训练状态
     if cfg.resume:
         logger.info('------------------------ Continue training ------------------------')

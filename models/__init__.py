@@ -1,5 +1,5 @@
 from .d_projector import DProjector
-from .backbone import VisualEncoder
+from .backbone import VisualEncoder, ResNet50Encoder
 from .bev import BEVTransformer, BEVLinearAttention
 from .encoder import DualInputVisualEncoder
 from .text_encoder import TextEncoderBert, TextEncoderLLM

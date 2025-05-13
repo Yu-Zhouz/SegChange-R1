@@ -38,11 +38,20 @@ class MaskHead(nn.Module):
         )
 
         # 掩码预测头
+        # self.mask_head = nn.Sequential(
+        #     nn.Conv2d(vis_dim * 2, vis_dim, kernel_size=3, padding=1),
+        #     nn.GroupNorm(32, vis_dim),
+        #     nn.ReLU(),
+        #     nn.Conv2d(vis_dim, num_classes, kernel_size=1)
+        # )
         self.mask_head = nn.Sequential(
-            nn.Conv2d(vis_dim * 2, vis_dim, kernel_size=3, padding=1),
-            nn.GroupNorm(32, vis_dim),
+            nn.Conv2d(vis_dim * 2, vis_dim // 2, kernel_size=1),  # 1x1卷积减少通道数
+            nn.GroupNorm(32, vis_dim // 2),
             nn.ReLU(),
-            nn.Conv2d(vis_dim, num_classes, kernel_size=1)
+            nn.Conv2d(vis_dim // 2, vis_dim // 4, kernel_size=3, padding=1),  # 3x3卷积
+            nn.GroupNorm(32, vis_dim // 4),
+            nn.ReLU(),
+            nn.Conv2d(vis_dim // 4, num_classes, kernel_size=1)
         )
 
     def forward(self, merged_feat, description_embeddings):
@@ -80,12 +89,41 @@ class MaskHead(nn.Module):
 
 # 测试
 if __name__ == '__main__':
-    model = MaskHead(vis_dim=256, lang_dim=2048, num_classes=1, n_heads=8).to('cuda')
-    merged_feat = torch.randn(2, 256, 128, 128).to('cuda')
-    description_embeddings = torch.randn(2, 4, 2048).to('cuda')  # 假设描述嵌入长度为50
+    model = MaskHead(vis_dim=256, lang_dim=768, num_classes=1, n_heads=8).to('cuda')
+    merged_feat = torch.randn(2, 256, 512, 512).to('cuda')
+    description_embeddings = torch.randn(2, 9, 768).to('cuda')  # 假设描述嵌入长度为9
+    import time
+
+    start = time.time()
     logits = model(merged_feat, description_embeddings)
+    last = time.time()
     print(logits.shape)  # 验证输出形状
 
     from thop import profile
-    flops, params = profile(model, inputs=(merged_feat, description_embeddings))
-    print(f"MaskGenerator FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+    # 计算每个模块的FLOPs
+    with torch.no_grad():
+        # DProjector
+        flops, params = profile(model.d_projector, inputs=(description_embeddings, merged_feat), verbose=False)
+        print(f"DProjector FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+
+        # Transformer Decoder
+        visual_features = merged_feat.flatten(2).permute(2, 0, 1)
+        queries = model.query_embed.weight.unsqueeze(1).repeat(1, 2, 1)
+        flops, params = profile(model.transformer_decoder, inputs=(queries, visual_features), verbose=False)
+        print(f"Transformer Decoder FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+
+        # Channel Attention
+        flops, params = profile(model.channel_attn, inputs=(merged_feat,), verbose=False)
+        print(f"Channel Attention FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+
+        # Mask Head
+        query_vec = model.d_projector(description_embeddings, merged_feat)
+        attended_feat = merged_feat * (model.channel_attn(merged_feat) + query_vec.view(2, 256, 1, 1))
+        q_expanded = model.transformer_decoder(queries, visual_features).mean(0).view(2, 256, 1, 1).expand(-1, -1, 512, 512)
+        cat_feat = torch.cat([attended_feat, q_expanded], dim=1)
+        flops, params = profile(model.mask_head, inputs=(cat_feat,), verbose=False)
+        print(f"Mask Head FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+
+    # 总FLOPs
+    total_flops, total_params = profile(model, inputs=(merged_feat, description_embeddings), verbose=False)
+    print(f"encoder FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {(last - start):.2f} s")

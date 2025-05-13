@@ -120,10 +120,13 @@ if __name__ == '__main__':
               torch.randn(2, 256, 64, 64).to('cuda'),
               torch.randn(2, 256, 32, 32).to('cuda'),
               torch.randn(2, 256, 16, 16).to('cuda')]
+    import time
+    start = time.time()
     diff_feats = model(feats1, feats2)
+    last = time.time()
     for i in range(len(diff_feats)):
         print(diff_feats[i].shape)
 
     from thop import profile
     flops, params = profile(model, inputs=(feats1, feats2))
-    print(f"diff FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+    print(f"encoder FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {(last - start):.2f} s")

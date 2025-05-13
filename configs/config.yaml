@@ -2,9 +2,8 @@ name: 'train'
 device: 'cuda:1'
 seed: 42
 output_dir: ./work_dirs
-num_workers: 2
-frozen_weights: null
-resume: null
+num_workers: 8
+resume: null  # 如果存在，则恢复训练
 data_root: ./data
 data_format: 'custom'  # [default, custom]
 
@@ -20,7 +19,7 @@ data:
 
 model:
   num_classes: 1
-  backbone_name: "swin_base_patch4_window7_224"
+  backbone_name: "resnet50"  # ['swin_base_patch4_window7_224', 'resnet50']
   bev_name: "LinearAttention"  # [LinearAttention, Transformer]
   diff_attention: "CBAM"  # ['SE', 'CBAM']
   out_dims: [256, 256, 256, 256]
@@ -29,6 +28,7 @@ model:
   img_size: 512
   use_text_description: True  # 是否使用文本描述
   text_encoder_name: "bert-base-uncased"  # [microsoft/phi-1_5, bert-base-uncased]
+  desc_embs: "./weights/embeddings.pt"   # 文本描述向量地址
   freeze_text_encoder: True # 冻结模型参数
 
 loss:
@@ -50,7 +50,7 @@ training:
   lr: 0.0001
   lr_backbone: 0.00001
   lr_drop: 200
-  batch_size: 4
+  batch_size: 8
   eval_freq: 1
   start_eval: 1
   threshold: 0.5

@@ -9,15 +9,19 @@
 @Usage   :
 """
 import torch.nn as nn
-from models import VisualEncoder, BEVTransformer, BEVLinearAttention
+from models import VisualEncoder, BEVTransformer, BEVLinearAttention, ResNet50Encoder
 
 
 class DualInputVisualEncoder(nn.Module):
     def __init__(self, cfg):
         super().__init__()
-        self.encoder = VisualEncoder(cfg)
-        # 添加1×1卷积层用于统一通道
-        self.conv_list = nn.ModuleList([nn.Conv2d(in_dim, out_dim, kernel_size=1) for in_dim, out_dim in zip([128, 256, 512, 1024], cfg.model.out_dims)])
+        if cfg.model.backbone_name == 'resnet50':
+            self.encoder = ResNet50Encoder(cfg)
+            self.conv_list = nn.ModuleList([nn.Conv2d(in_dim, out_dim, kernel_size=1) for in_dim, out_dim in zip([256, 512, 1024, 2048], cfg.model.out_dims)])
+        elif cfg.model.backbone_name == 'swin_base_patch4_window7_224':
+            self.encoder = VisualEncoder(cfg)
+            # 添加1×1卷积层用于统一通道
+            self.conv_list = nn.ModuleList([nn.Conv2d(in_dim, out_dim, kernel_size=1) for in_dim, out_dim in zip([128, 256, 512, 1024], cfg.model.out_dims)])
 
         if cfg.model.bev_name == 'Transformer':
             self.bev = nn.ModuleList([
@@ -53,13 +57,17 @@ if __name__ == '__main__':
     import torch
     from utils import load_config
     cfg = load_config('../configs/config.yaml')
+    cfg.model.backbone_name = 'resnet50'
     model = DualInputVisualEncoder(cfg).to('cuda')
     image1 = torch.randn(2, 3, 512, 512).to('cuda')
     image2 = torch.randn(2, 3, 512, 512).to('cuda')
+    import time
+    start = time.time()
     feats1, feats2 = model(image1, image2)
+    last = time.time()
     for i in range(len(feats1)):
         print(feats1[i].shape, feats2[i].shape)
 
     from thop import profile
     flops, params = profile(model, inputs=(image1, image2))
-    print(f"encoder FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+    print(f"encoder FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {(last - start):.2f} s")
