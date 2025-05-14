@@ -8,6 +8,8 @@
 @Desc    : 测试建筑物变化检测模型
 @Usage   :
 """
+import time
+
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
@@ -30,11 +32,28 @@ def get_args_config():
     return cfg
 
 
+import argparse
+import pprint
+import time
+from utils import load_config, get_output_dir, setup_logging
+
+
+def get_args_config():
+    parser = argparse.ArgumentParser('SegChange')
+    parser.add_argument('-c', '--config', type=str, required=True, help='The path of config file')
+    args = parser.parse_args()
+    if args.config is not None:
+        cfg = load_config(args.config)
+    else:
+        raise ValueError('Please specify the config file')
+    return cfg
+
+
 def main():
     cfg = get_args_config()
     output_dir = get_output_dir(cfg.test.save_dir, cfg.test.name)
     logger = setup_logging(cfg, output_dir)
-
+    logger.info('Test Log %s' % time.strftime("%c"))
     logger.info('Running with config:')
     logger.info(pprint.pformat(cfg.__dict__))
     device = cfg.test.device

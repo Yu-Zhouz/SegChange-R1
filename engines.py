@@ -127,6 +127,10 @@ def evaluate_model(cfg, model, dataloader, device, output_dir):
     all_preds = []
     all_labels = []
 
+    # 创建保存拼接图像的目录
+    comparison_dir = os.path.join(output_dir, 'comparisons')
+    os.makedirs(comparison_dir, exist_ok=True)
+
     with torch.no_grad(), tqdm(dataloader, desc='[Testing]') as pbar:
         for images_a, images_b, prompt, labels in pbar:
             images_a = images_a.to(device)
@@ -145,7 +149,7 @@ def evaluate_model(cfg, model, dataloader, device, output_dir):
             all_preds.extend(preds.flatten())
             all_labels.extend(labels_np.flatten())
 
-            # Optional: save predicted image
+            # Optional: save predicted image and comparison image
             if cfg.test.show:
                 pred_save_dir = os.path.join(output_dir, 'predictions')
                 os.makedirs(pred_save_dir, exist_ok=True)
@@ -177,6 +181,14 @@ def evaluate_model(cfg, model, dataloader, device, output_dir):
                     overlay_img = overlay_mask_on_image(images_a.cpu().numpy()[0], pred_mask, cfg.model.num_classes)
                     overlay_img.save(os.path.join(overlay_dir, f'{pbar.n}_overlay.png'))
 
+                # 保存A, B, target, pred的对比图像
+                # 还原 images_a 和 images_b 到原始图像
+                images_a_unnorm = reverse_normalize(images_a.cpu(), mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                images_b_unnorm = reverse_normalize(images_b.cpu(), mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+                comparison_img = create_comparison_image(images_a_unnorm[0], images_b_unnorm[0], labels_np[0], pred_mask, cfg.model.num_classes)
+                comparison_img.save(os.path.join(comparison_dir, f'{pbar.n}_comparison.png'))
+
     if cfg.model.num_classes == 1:
         # Binary classification metrics
         precision = precision_score(all_labels, all_preds, zero_division=0)
@@ -203,20 +215,34 @@ def evaluate_model(cfg, model, dataloader, device, output_dir):
     return metrics
 
 
-def overlay_mask_on_image(image, mask, num_classes):
+def reverse_normalize(image_tensor, mean, std):
     """
-    将掩码叠加到图像上
+    逆归一化操作，将归一化的图像张量还原为原始图像
+    Args:
+        image_tensor: 归一化的图像张量 (Tensor, B x C x H x W)
+        mean: 均值 (list)
+        std: 标准差 (list)
+    Returns:
+        还原后的图像张量 (Tensor, B x C x H x W)
+    """
+    mean = torch.tensor(mean).view(1, -1, 1, 1)
+    std = torch.tensor(std).view(1, -1, 1, 1)
+    return image_tensor * std + mean
+
+
+def overlay_mask_on_image(image, mask, num_classes, alpha=0.5):
+    """
+    将掩码叠加到原始图像上
     Args:
         image: 原始图像 (numpy array, H x W x C)
         mask: 掩码 (numpy array, H x W)
         num_classes: 类别数量
+        alpha: 背景图像的透明度
     Returns:
         PIL Image
     """
     # 将图像从 numpy 格式转换为 PIL Image
-    if image.shape[0] == 3:  # 如果图像是 C x H x W 格式，转换为 H x W x C
-        image = np.transpose(image, (1, 2, 0))
-    img = Image.fromarray((image * 255).astype(np.uint8))
+    image = Image.fromarray((image * 255).astype(np.uint8))
 
     # 创建掩码图像
     if num_classes == 1:
@@ -229,11 +255,61 @@ def overlay_mask_on_image(image, mask, num_classes):
         mask_img = Image.fromarray(mask_colored[:, :, :3])
 
     # 将掩码图像调整为与原始图像相同的尺寸
-    mask_img = mask_img.resize(img.size)
+    mask_img = mask_img.resize(image.size)
 
     # 将掩码叠加到图像上
-    overlay = Image.new('RGBA', img.size)
+    overlay = Image.new('RGBA', image.size)
     overlay.paste(mask_img.convert('RGBA'), (0, 0), mask_img.convert('L'))
-    overlay_img = Image.alpha_composite(img.convert('RGBA'), overlay)
+    overlayed_img = Image.alpha_composite(image.convert('RGBA'), overlay)
 
-    return overlay_img
+    return overlayed_img
+
+
+def create_comparison_image(image_a, image_b, target_mask, pred_mask, num_classes):
+    """
+    创建包含原始图像A、原始图像B、目标掩码和预测掩码的对比图像
+    Args:
+        image_a: 原始图像A (Tensor, C x H x W)
+        image_b: 原始图像B (Tensor, C x H x W)
+        target_mask: 目标掩码 (numpy array, H x W)
+        pred_mask: 预测掩码 (numpy array, H x W)
+        num_classes: 类别数量
+    Returns:
+        PIL Image
+    """
+    # 将张量转换为 NumPy 数组
+    image_a = image_a.numpy()  # Tensor -> NumPy
+    image_b = image_b.numpy()  # Tensor -> NumPy
+
+    # 将图像从 C x H x W 转换为 H x W x C
+    image_a = np.transpose(image_a, (1, 2, 0))  # C x H x W -> H x W x C
+    image_b = np.transpose(image_b, (1, 2, 0))  # C x H x W -> H x W x C
+
+    # 将图像和掩码转换为PIL图像
+    image_a = Image.fromarray((image_a * 255).astype(np.uint8))
+    image_b = Image.fromarray((image_b * 255).astype(np.uint8))
+
+    if num_classes == 1:
+        # 单类别：黑白掩码
+        if target_mask.ndim == 3:
+            target_mask = target_mask[0]  # 去掉通道维度
+        if pred_mask.ndim == 3:
+            pred_mask = pred_mask[0]  # 去掉通道维度
+        target_img = Image.fromarray((target_mask * 255).astype(np.uint8), mode='L')
+        pred_img = Image.fromarray((pred_mask * 255).astype(np.uint8), mode='L')
+    else:
+        # 多类别：彩色掩码
+        cmap = plt.get_cmap('viridis', num_classes)
+        target_colored = (cmap(target_mask) * 255).astype(np.uint8)
+        pred_colored = (cmap(pred_mask) * 255).astype(np.uint8)
+        target_img = Image.fromarray(target_colored[:, :, :3])
+        pred_img = Image.fromarray(pred_colored[:, :, :3])
+
+    # 将四张图像拼接在一起
+    comparison_img = Image.new('RGB', (image_a.width * 4, image_a.height))
+    comparison_img.paste(image_a, (0, 0))
+    comparison_img.paste(image_b, (image_a.width, 0))
+    comparison_img.paste(target_img.convert('RGB'), (image_a.width * 2, 0))
+    comparison_img.paste(pred_img.convert('RGB'), (image_a.width * 3, 0))
+
+    return comparison_img
