@@ -75,7 +75,7 @@ def main():
     ])
 
     test_dataset = Building(
-        data_root=cfg.test.test_img_dirs,
+        data_root=cfg.test.img_dirs,
         a_transform=transform,
         b_transform=transform,
         test=True,

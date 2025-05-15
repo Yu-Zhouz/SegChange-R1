@@ -10,6 +10,7 @@
 """
 import os
 
+import cv2
 import numpy as np
 import torch
 from PIL import Image
@@ -265,51 +266,82 @@ def overlay_mask_on_image(image, mask, num_classes, alpha=0.5):
     return overlayed_img
 
 
+
 def create_comparison_image(image_a, image_b, target_mask, pred_mask, num_classes):
     """
-    创建包含原始图像A、原始图像B、目标掩码和预测掩码的对比图像
-    Args:
-        image_a: 原始图像A (Tensor, C x H x W)
-        image_b: 原始图像B (Tensor, C x H x W)
-        target_mask: 目标掩码 (numpy array, H x W)
-        pred_mask: 预测掩码 (numpy array, H x W)
-        num_classes: 类别数量
-    Returns:
-        PIL Image
+    创建对比图像，并在原始图像上绘制掩码边界（支持控制线条粗细）
     """
-    # 将张量转换为 NumPy 数组
-    image_a = image_a.numpy()  # Tensor -> NumPy
-    image_b = image_b.numpy()  # Tensor -> NumPy
+    # 将张量转换为 NumPy 数组并调整形状
+    image_a = image_a.numpy().transpose(1, 2, 0)  # C x H x W -> H x W x C
+    image_b = image_b.numpy().transpose(1, 2, 0)
+    image_a = (image_a * 255).astype(np.uint8)
+    image_b = (image_b * 255).astype(np.uint8)
 
-    # 将图像从 C x H x W 转换为 H x W x C
-    image_a = np.transpose(image_a, (1, 2, 0))  # C x H x W -> H x W x C
-    image_b = np.transpose(image_b, (1, 2, 0))  # C x H x W -> H x W x C
-
-    # 将图像和掩码转换为PIL图像
-    image_a = Image.fromarray((image_a * 255).astype(np.uint8))
-    image_b = Image.fromarray((image_b * 255).astype(np.uint8))
-
+    # 单类别处理
     if num_classes == 1:
-        # 单类别：黑白掩码
         if target_mask.ndim == 3:
-            target_mask = target_mask[0]  # 去掉通道维度
+            target_mask = target_mask[0]
         if pred_mask.ndim == 3:
-            pred_mask = pred_mask[0]  # 去掉通道维度
+            pred_mask = pred_mask[0]
+
+        target_mask_np = (target_mask * 255).astype(np.uint8)
+        pred_mask_np = (pred_mask * 255).astype(np.uint8)
+
+        contours_target, _ = cv2.findContours(target_mask_np, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours_pred, _ = cv2.findContours(pred_mask_np, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # 设置颜色和线宽
+        color_target = (0, 0, 255)  # BGR 格式，红色
+        color_pred = (255, 255, 255)  # 白色
+        thickness = 2  # 控制线条粗细
+
+
+        # 在图像 A 上同时绘制 target（红）和 pred（白）
+        image_a_contour = image_a.copy()
+        image_a_contour = cv2.drawContours(image_a_contour, contours_target, -1, color_target, thickness)
+        image_a_contour = cv2.drawContours(image_a_contour, contours_pred, -1, color_pred, thickness)
+
+        # 在图像 B 上也同时绘制 target（红）和 pred（白）
+        image_b_contour = image_b.copy()
+        image_b_contour = cv2.drawContours(image_b_contour, contours_target, -1, color_target, thickness)
+        image_b_contour = cv2.drawContours(image_b_contour, contours_pred, -1, color_pred, thickness)
+
+    else:
+        # 多类别处理（仅绘制前景区域）
+        target_mask_binary = (target_mask > 0).astype(np.uint8) * 255
+        pred_mask_binary = (pred_mask > 0).astype(np.uint8) * 255
+
+        contours_target, _ = cv2.findContours(target_mask_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours_pred, _ = cv2.findContours(pred_mask_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        color_target = (0, 0, 255)
+        color_pred = (0, 255, 0)
+        thickness = 2
+
+        image_a_contour = cv2.drawContours(image_a.copy(), contours_target, -1, color_target, thickness)
+        image_b_contour = cv2.drawContours(image_b.copy(), contours_pred, -1, color_pred, thickness)
+
+    # 转换回 PIL 图像用于拼接
+    image_a_pil = Image.fromarray(image_a_contour)
+    image_b_pil = Image.fromarray(image_b_contour)
+
+    # 掩码图像（保持不变）
+    if num_classes == 1:
         target_img = Image.fromarray((target_mask * 255).astype(np.uint8), mode='L')
         pred_img = Image.fromarray((pred_mask * 255).astype(np.uint8), mode='L')
     else:
-        # 多类别：彩色掩码
         cmap = plt.get_cmap('viridis', num_classes)
         target_colored = (cmap(target_mask) * 255).astype(np.uint8)
         pred_colored = (cmap(pred_mask) * 255).astype(np.uint8)
         target_img = Image.fromarray(target_colored[:, :, :3])
         pred_img = Image.fromarray(pred_colored[:, :, :3])
 
-    # 将四张图像拼接在一起
-    comparison_img = Image.new('RGB', (image_a.width * 4, image_a.height))
-    comparison_img.paste(image_a, (0, 0))
-    comparison_img.paste(image_b, (image_a.width, 0))
-    comparison_img.paste(target_img.convert('RGB'), (image_a.width * 2, 0))
-    comparison_img.paste(pred_img.convert('RGB'), (image_a.width * 3, 0))
+    # 拼接图像
+    comparison_img = Image.new('RGB', (image_a_pil.width * 4, image_a_pil.height))
+    comparison_img.paste(image_a_pil, (0, 0))
+    comparison_img.paste(image_b_pil, (image_a_pil.width, 0))
+    comparison_img.paste(target_img.convert('RGB'), (image_a_pil.width * 2, 0))
+    comparison_img.paste(pred_img.convert('RGB'), (image_a_pil.width * 3, 0))
 
     return comparison_img
+
