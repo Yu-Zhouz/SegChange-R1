@@ -79,20 +79,29 @@ data/
 ## 训练
 
 ### 生成词嵌入文件
-如果需要只做固定类别的变化检测，例如房屋变化检测，可先生成固定的描述文本词嵌入文件，并保存在`weights/embeddings.pt`文件中，将嵌入文件地址填入 参数文件[configs](./configs/config.yaml)中`desc_embs`，这样的好处是，训练速度会更快，训练结果更准确。
-```shell
-python text_embs.py -c ./configs/config.yaml
+可先生成固定的描述文本词嵌入文件，并保存在`weights/embeddings.pt`文件中，将嵌入文件地址填入 参数文件[configs](./configs/config.yaml)中`desc_embs`，这样的好处是，训练速度会更快，训练结果更准确。
+```bash
+python ./examples/text_embs.py -c ./configs/config.yaml
 ```
-如果需要做多类别变化检测，则需要将描述文本词嵌入文件保存在`weights/embeddings.pt`文件中，并修改参数文件[configs](./configs/config.yaml)中的`desc_embs`为`None`，直接训练即可。
+也可以使用[文本生成](./examples/text_gen.py), 并修改参数文件[configs](./configs/config.yaml)中的`desc_embs`为`None`，执行脚本。
+```bash
+python ./examples/text_gen.py -c ./configs/config.yaml
+```
+如果需要做多类别变化检测，则需要手工标注类别描述文本。
 
 ### 命令行训练
-```shell
+```bash
 python train.py -c ./configs/config.yaml
 ```
 
 ## 测试
-```shell
+```bash
 python test.py -c ./configs/config.yaml
+```
+
+## 推理TIF
+```bash
+python inference.py -c ./configs/config.yaml
 ```
 
 ## 贡献
@@ -102,3 +111,10 @@ python test.py -c ./configs/config.yaml
 ## 许可证
 
 本项目使用 [MIT许可证](LICENSE)
+
+
+## 参考
+https://blog.csdn.net/weixin_45679938/article/details/142030784
+https://www.arxiv.org/pdf/2503.11070
+https://www.arxiv.org/abs/2503.16825
+https://zhuanlan.zhihu.com/p/627646794

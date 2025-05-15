@@ -10,8 +10,12 @@
 """
 import argparse
 import os
-
+import sys
 import torch
+
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(parent_dir)
+
 from models import TextEncoderLLM, TextEncoderBert
 from utils import load_config
 
@@ -29,7 +33,7 @@ def get_args_config():
 
 def emb_model():
     cfg = get_args_config()
-    prompts = ["Buildings with changes, Land of change"]
+    prompts = cfg.additional_text if hasattr(cfg, 'additional_text') else 'Buildings with changes'
     if cfg.model.text_encoder_name == "microsoft/phi-1_5":
         model = TextEncoderLLM(model_name=cfg.model.text_encoder_name, device=cfg.device,
                                freeze_text_encoder=cfg.model.freeze_text_encoder)

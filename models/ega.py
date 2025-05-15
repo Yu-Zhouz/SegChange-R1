@@ -31,7 +31,7 @@ class Scharr(nn.Module):
     def forward(self, x):
         edges_x = self.conv_x(x)
         edges_y = self.conv_y(x)
-        scharr_edge = torch.sqrt(edges_x ** 2 + edges_y ** 2)
+        scharr_edge = torch.sqrt(edges_x ** 2 + edges_y ** 2 + 1e-6)  # 添加小值以防止数值不稳定
         scharr_edge = self.act(self.norm(scharr_edge))
         return scharr_edge
 

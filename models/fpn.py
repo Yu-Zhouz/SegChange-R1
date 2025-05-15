@@ -71,7 +71,7 @@ class FPNFeatureFuser(nn.Module):
 
 
 class LightweightFPN(nn.Module):
-    def __init__(self, in_channels, fpn_out_channels=128, feature_strides=[4, 8, 16, 32], use_token_connector=False, use_ega=True):
+    def __init__(self, in_channels, fpn_out_channels=256, feature_strides=[4, 8, 16, 32], use_token_connector=False, use_ega=True):
         super().__init__()
         self.use_token_connector = use_token_connector
         self.use_ega = use_ega  # 是否使用 EGA
@@ -111,11 +111,11 @@ class LightweightFPN(nn.Module):
 
 
 if __name__ == '__main__':
-    multi_scale_feats = [torch.randn(2, 256, 128, 128).to('cuda:1'),
-                         torch.randn(2, 256, 64, 64).to('cuda:1'),
-                         torch.randn(2, 256, 32, 32).to('cuda:1'),
-                         torch.randn(2, 256, 16, 16).to('cuda:1')]
-    fpn_feature_fuser = FPNFeatureFuser(in_channels=[256, 256, 256, 256]).to('cuda:1')
+    multi_scale_feats = [torch.randn(2, 256, 128, 128).to('cuda'),
+                         torch.randn(2, 256, 64, 64).to('cuda'),
+                         torch.randn(2, 256, 32, 32).to('cuda'),
+                         torch.randn(2, 256, 16, 16).to('cuda')]
+    fpn_feature_fuser = FPNFeatureFuser(in_channels=[256, 256, 256, 256]).to('cuda')
     import time
     start = time.time()
     fpn_feats = fpn_feature_fuser(multi_scale_feats)
@@ -127,13 +127,13 @@ if __name__ == '__main__':
     print(f"encoder FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {(last - start):.2f} s")
 
     # 示例输入
-    multi_scale_feats = [torch.randn(2, 256, 128, 128).to('cuda:1'),
-                         torch.randn(2, 256, 64, 64).to('cuda:1'),
-                         torch.randn(2, 256, 32, 32).to('cuda:1'),
-                         torch.randn(2, 256, 16, 16).to('cuda:1')]
+    multi_scale_feats = [torch.randn(2, 256, 128, 128).to('cuda'),
+                         torch.randn(2, 256, 64, 64).to('cuda'),
+                         torch.randn(2, 256, 32, 32).to('cuda'),
+                         torch.randn(2, 256, 16, 16).to('cuda')]
 
     # 创建轻量化FPN
-    light_fpn = LightweightFPN(in_channels=[256, 256, 256, 256]).to('cuda:1')
+    light_fpn = LightweightFPN(in_channels=[256, 256, 256, 256]).to('cuda')
 
     # 测试
     import time

@@ -26,8 +26,7 @@ class ChangeModel(nn.Module):
             self.fpn = FPNFeatureFuser(in_channels=self.cfg.model.out_dims, use_token_connector=self.cfg.model.use_token_connector,
                                        use_ega=self.cfg.model.use_ega).to(self.device)
         elif self.cfg.model.fpn_type == 'L-FPN':
-            self.fpn = LightweightFPN(in_channels=self.cfg.model.out_dims, fpn_out_channels=self.cfg.model.fpn_out_channels,
-                                      feature_strides=self.cfg.model.feature_strides, use_token_connector=self.cfg.model.use_token_connector,
+            self.fpn = LightweightFPN(in_channels=self.cfg.model.out_dims, use_token_connector=self.cfg.model.use_token_connector,
                                       use_ega=self.cfg.model.use_ega).to(self.device)
         else:
             raise NotImplementedError(f"Unsupported FPN type: {self.cfg.model.fpn_type}")
@@ -61,10 +60,12 @@ class ChangeModel(nn.Module):
         # 将原始图像尺寸传入 FPN Feature Fuser
         merged_feat = self.fpn(multi_scale_diff_feats)
 
+        description_embeddings = None
         if self.use_text_description:
             if self.desc_embs is not None:
                 # 加载预计算的描述嵌入调整批次
-                description_embeddings = torch.load(self.desc_embs).to(self.device).expand(B, -1, -1)  # 形状: [B, num_descriptions, lang_dim]
+                description_embeddings = torch.load(self.desc_embs).to(self.device).expand(B, -1,
+                                                                                           -1)  # 形状: [B, num_descriptions, lang_dim]
             elif prompts is not None:
                 # 实时通过 LLM 生成描述嵌入
                 description_embeddings, _ = self.llm(prompts)
@@ -73,6 +74,10 @@ class ChangeModel(nn.Module):
                 description_embeddings = torch.zeros((B, 4, self.lang_dim), device=self.device)
         else:
             # 如果不使用文本描述，可以使用占位符或默认值
+            description_embeddings = torch.zeros((B, 4, self.lang_dim), device=self.device)
+
+        # 确保 description_embeddings 不为 None
+        if description_embeddings is None:
             description_embeddings = torch.zeros((B, 4, self.lang_dim), device=self.device)
 
         mask = self.mask_head(merged_feat, description_embeddings)
@@ -116,13 +121,13 @@ if __name__ == '__main__':
     cfg = load_config("../configs/config.yaml")
     device = cfg.device  # 从配置中获取设备，例如 'cuda' 或 'cpu'
     cfg.model.backbone_name = 'swin_base_patch4_window7_224'
-    cfg.model.desc_embs = "../weights/embeddings.pt"
+    cfg.model.desc_embs = None
     model = ChangeModel(cfg).to(device)  # 将整个模型移动到指定设备
 
     # 输入张量也移动到相同设备
     image1 = torch.randn(2, 3, 512, 512).to(device)
     image2 = torch.randn(2, 3, 512, 512).to(device)
-    prompts = ["Detection of building changes"]
+    prompts = ["Detection of building changes",  "Detection of building changes"]
 
     from thop import profile
 
@@ -145,7 +150,7 @@ if __name__ == '__main__':
 
         # Mask Head
         merged_feat = model.fpn(multi_scale_diff_feats)
-        if model.use_text_description:
+        if model.use_text_description and model.desc_embs is not None:
             description_embeddings = torch.load(model.desc_embs).to(device).expand(2, -1, -1)
         else:
             description_embeddings = torch.zeros((2, 4, model.lang_dim), device=device)
