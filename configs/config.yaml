@@ -21,6 +21,8 @@ model:
   num_classes: 1
   backbone_name: "resnet50"  # ['swin_base_patch4_window7_224', 'resnet50']
   bev_name: "LinearAttention"  # [LinearAttention, Transformer]
+  fpn_type: "FPN" # ['FPN', 'L-FPN']
+  use_ega: false  # 是否使用 边缘-高斯聚合（EGA）模块
   diff_attention: "CBAM"  # ['SE', 'CBAM']
   out_dims: [256, 256, 256, 256]
   use_token_connector: False  # 是否降低 token 维度
@@ -56,12 +58,12 @@ training:
   threshold: 0.5
 
 test:
-  test_img_dirs: './data/change/val'
+  test_img_dirs: './data'
   batch_size: 1
   threshold: 0.5
   device: 'cuda:1'
   save_dir: "./work_dirs"
   name: "test"
-  weight_path: "./work_dirs/train_1/checkpoints/best_iou.pth"
+  weight_path: "./work_dirs/train_3/checkpoints/best_iou.pth"
   show: True
   show_overlay: False

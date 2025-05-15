@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 def load_model(model_path, device='cuda'):
     """从文件中加载完整模型"""
     cfg = load_config("../configs/config.yaml")
+    cfg.model.desc_embs = "../weights/embeddings.pt"
     model = ChangeModel(cfg)
 
     state_dict = torch.load(model_path, map_location=device)
@@ -138,7 +139,7 @@ def nested_tensor_from_tensor_list(tensor_list):
 
 def main():
     # 设置路径
-    model_path = "../work_dirs/train_0/checkpoints/best_iou.pth"
+    model_path = "../work_dirs/train_3/checkpoints/best_iou.pth"
     image1_path = "./images/1_a.png"
     image2_path = "./images/1_b.png"
     desc_text = ["Detection of building changes"]  # 示例文本

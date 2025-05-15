@@ -11,7 +11,7 @@
 from torch import nn
 import torch
 from models import MaskHead, DualInputVisualEncoder, FeatureDiffModule, TextEncoderBert, TextEncoderLLM, \
-    FPNFeatureFuser
+    FPNFeatureFuser, LightweightFPN
 from models.losses import TotalLoss
 
 
@@ -22,7 +22,15 @@ class ChangeModel(nn.Module):
         self.device = self.cfg.device
         self.dual_encoder = DualInputVisualEncoder(cfg).to(self.device)
         self.feature_diff = FeatureDiffModule(in_channels_list=self.cfg.model.out_dims, diff_attention=self.cfg.model.diff_attention).to(self.device)
-        self.fpn = FPNFeatureFuser(in_channels=self.cfg.model.out_dims, use_token_connector=self.cfg.model.use_token_connector).to(self.device)
+        if self.cfg.model.fpn_type == 'FPN':
+            self.fpn = FPNFeatureFuser(in_channels=self.cfg.model.out_dims, use_token_connector=self.cfg.model.use_token_connector,
+                                       use_ega=self.cfg.model.use_ega).to(self.device)
+        elif self.cfg.model.fpn_type == 'L-FPN':
+            self.fpn = LightweightFPN(in_channels=self.cfg.model.out_dims, fpn_out_channels=self.cfg.model.fpn_out_channels,
+                                      feature_strides=self.cfg.model.feature_strides, use_token_connector=self.cfg.model.use_token_connector,
+                                      use_ega=self.cfg.model.use_ega).to(self.device)
+        else:
+            raise NotImplementedError(f"Unsupported FPN type: {self.cfg.model.fpn_type}")
         self.lang_dim = 2048 if cfg.model.text_encoder_name == 'microsoft/phi-1_5' else 768
         self.use_text_description = cfg.model.use_text_description
         self.desc_embs = cfg.model.desc_embs  # 预训练文本嵌入路径

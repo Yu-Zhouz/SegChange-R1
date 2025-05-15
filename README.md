@@ -59,6 +59,7 @@ data/
       ├── label/              # 测试标签（变化掩码）
       └── prompts.txt         # 测试集文本描述提示
 ```
+修改参数文件[configs](./configs/config.yaml)中的`data_format`为`default`。
 
 ### 2. 自定义结构：
 数据集的结构如下：
@@ -73,6 +74,7 @@ data/
   │   └── test.txt        # 验证集列表
   └── prompts.txt         # 训练集文本描述提示
 ```
+修改参数文件[configs](./configs/config.yaml)中的`data_format`为`custom`。
 
 ## 训练
 
@@ -100,10 +102,3 @@ python test.py -c ./configs/config.yaml
 ## 许可证
 
 本项目使用 [MIT许可证](LICENSE)
-
-
-## 参考
-https://blog.csdn.net/weixin_45679938/article/details/142030784
-https://www.arxiv.org/pdf/2503.11070
-https://www.arxiv.org/abs/2503.16825
-https://zhuanlan.zhihu.com/p/627646794
