@@ -9,7 +9,7 @@
 @Usage   :
 """
 import torch.nn as nn
-from models import VisualEncoder, BEVTransformer, BEVLinearAttention, ResNet50Encoder
+from models import VisualEncoder, BEVTransformer, BEVLinearAttention, ResNet50Encoder, HGNetv2
 
 
 class DualInputVisualEncoder(nn.Module):
@@ -22,6 +22,9 @@ class DualInputVisualEncoder(nn.Module):
             self.encoder = VisualEncoder(cfg)
             # 添加1×1卷积层用于统一通道
             self.conv_list = nn.ModuleList([nn.Conv2d(in_dim, out_dim, kernel_size=1) for in_dim, out_dim in zip([128, 256, 512, 1024], cfg.model.out_dims)])
+        elif cfg.model.backbone_name == 'hgnetv2':
+            self.encoder = HGNetv2(name="B0", use_lab=True, return_idx=[0, 1, 2, 3])
+            self.conv_list = nn.ModuleList([nn.Conv2d(in_dim, out_dim, kernel_size=1) for in_dim, out_dim in zip([64, 256, 512, 1024], cfg.model.out_dims)])
 
         if cfg.model.bev_name == 'Transformer':
             self.bev = nn.ModuleList([

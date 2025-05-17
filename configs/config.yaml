@@ -1,36 +1,37 @@
 name: 'train'
-device: 'cuda:1'
+device: 'cuda:2'
 seed: 42
 output_dir: ./work_dirs
 num_workers: 8
 resume: null  # 如果存在，则恢复训练
-data_root: ./data
+data_root: ./data/change
 data_format: 'custom'  # [default, custom]
+additional_text: 'Buildings with changes, Arable land changes, site changes, woodland changes.'
 
 data:
   transform: true
-  color_jitter: 0
-  rotation_degree: 0
-  gamma_range: [1.0, 1.0]
-  affine_degree: 0
-  erase_prob: 0
-  erase_ratio: [0, 0]
-  blur_sigma: 0
+  color_jitter: 0  # 颜色抖动
+  rotation_degree: 0  # 旋转角度
+  gamma_range: [1.0, 1.0]  # 亮度
+  affine_degree: 0   # 仿射变换
+  erase_prob: 0  # 随机擦除
+  erase_ratio: [0, 0]  # 随机擦除大小
+  blur_sigma: 0.3  # 高斯模糊
 
 model:
   num_classes: 1
-  backbone_name: "resnet50"  # ['swin_base_patch4_window7_224', 'resnet50']
+  backbone_name: "swin_base_patch4_window7_224"  # ['swin_base_patch4_window7_224', 'resnet50', 'hgnetv2']
   bev_name: "LinearAttention"  # [LinearAttention, Transformer]
-  fpn_type: "FPN" # ['FPN', 'L-FPN']
-  use_ega: false  # 是否使用 边缘-高斯聚合（EGA）模块
+  fpn_type: "L-FPN" # ['FPN', 'L-FPN']
+  use_ega: true  # 是否使用 边缘-高斯聚合（EGA）模块
   diff_attention: "CBAM"  # ['SE', 'CBAM']
   out_dims: [256, 256, 256, 256]
   use_token_connector: False  # 是否降低 token 维度
-  pretrained: True
+  pretrained: True  # 是否使用预训练的模型参数
   img_size: 512
   use_text_description: True  # 是否使用文本描述
   text_encoder_name: "bert-base-uncased"  # [microsoft/phi-1_5, bert-base-uncased]
-  desc_embs: "./weights/embeddings.pt"   # 文本描述向量地址
+  desc_embs: null   # 文本描述向量地址 "./weights/embeddings.pt"
   freeze_text_encoder: True # 冻结模型参数
 
 loss:
@@ -52,13 +53,13 @@ training:
   lr: 0.0001
   lr_backbone: 0.00001
   lr_drop: 200
-  batch_size: 8
+  batch_size: 4
   eval_freq: 1
   start_eval: 1
   threshold: 0.5
 
 test:
-  test_img_dirs: './data'
+  img_dirs: './data'
   batch_size: 1
   threshold: 0.5
   device: 'cuda:1'
@@ -67,3 +68,11 @@ test:
   weight_path: "./work_dirs/train_3/checkpoints/best_iou.pth"
   show: True
   show_overlay: False
+
+infer:
+  name: 'infer'
+  input_dir:  './data/tif'
+  weights_dir: './work_dirs/train_3/checkpoints/best_iou.pth'
+  output_dir: './outputs'
+  threshold: 0.5
+  device: 'cuda:1'

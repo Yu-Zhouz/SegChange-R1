@@ -12,6 +12,7 @@ import torch
 import torch.nn as nn
 from einops import rearrange
 
+
 class LinearAttention(nn.Module):
     def __init__(self, dim, heads=8, dim_head=64):
         super().__init__()
@@ -75,14 +76,20 @@ class BEVLinearAttention(nn.Module):
         x_bev = self.proj(x_bev)
         return x_bev
 
+
 # 测试
 if __name__ == '__main__':
     x = torch.randn(2, 256, 128, 128).to('cuda')
     # model = BEVTransformer(in_channels=256, out_channels=256).to('cuda')
     model = BEVLinearAttention(in_channels=256, out_channels=256).to('cuda')
+    import time
+    start = time.time()
     bev_output = model(x)
+    last = time.time()
     print(f"BEV output shape: {bev_output.shape}")
 
     from thop import profile
+
     flops, params = profile(model, inputs=(x,))
-    print(f"BEVLinearAttention FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+    print(f"encoder FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {(last - start):.2f} s")
+

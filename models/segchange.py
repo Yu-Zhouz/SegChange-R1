@@ -66,7 +66,7 @@ class ChangeModel(nn.Module):
                 # 加载预计算的描述嵌入调整批次
                 description_embeddings = torch.load(self.desc_embs).to(self.device).expand(B, -1,
                                                                                            -1)  # 形状: [B, num_descriptions, lang_dim]
-            elif prompts is not None:
+            elif prompts is not None and prompts[0] != '':
                 # 实时通过 LLM 生成描述嵌入
                 description_embeddings, _ = self.llm(prompts)
             else:
@@ -120,7 +120,7 @@ if __name__ == '__main__':
 
     cfg = load_config("../configs/config.yaml")
     device = cfg.device  # 从配置中获取设备，例如 'cuda' 或 'cpu'
-    cfg.model.backbone_name = 'swin_base_patch4_window7_224'
+    cfg.model.backbone_name = 'hgnetv2'
     cfg.model.desc_embs = None
     model = ChangeModel(cfg).to(device)  # 将整个模型移动到指定设备
 
@@ -130,23 +130,27 @@ if __name__ == '__main__':
     prompts = ["Detection of building changes",  "Detection of building changes"]
 
     from thop import profile
+    import time
 
     # 计算每个模块的FLOPs
     with torch.no_grad():  # 禁用梯度计算
         # Dual Encoder
+        start_encoder = time.time()
         flops, params = profile(model.dual_encoder, inputs=(image1, image2), verbose=False)
-        print(f"Dual Encoder - FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+        print(f"Dual Encoder - FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {time.time() - start_encoder:.2f}")
 
         # Feature Diff
         multi_scale_bev_feats1, multi_scale_bev_feats2 = model.dual_encoder(image1, image2)
+        start_diff = time.time()
         flops, params = profile(model.feature_diff, inputs=(multi_scale_bev_feats1, multi_scale_bev_feats2),
                                 verbose=False)
-        print(f"Feature Diff - FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+        print(f"Feature Diff - FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {time.time() - start_diff:.2f}")
 
         # FPN
         multi_scale_diff_feats = model.feature_diff(multi_scale_bev_feats1, multi_scale_bev_feats2)
+        start_fpn = time.time()
         flops, params = profile(model.fpn, inputs=(multi_scale_diff_feats,), verbose=False)
-        print(f"FPN - FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+        print(f"FPN - FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {time.time() - start_fpn:.2f}")
 
         # Mask Head
         merged_feat = model.fpn(multi_scale_diff_feats)
@@ -154,13 +158,17 @@ if __name__ == '__main__':
             description_embeddings = torch.load(model.desc_embs).to(device).expand(2, -1, -1)
         else:
             description_embeddings = torch.zeros((2, 4, model.lang_dim), device=device)
+        start_mask = time.time()
         flops, params = profile(model.mask_head, inputs=(merged_feat, description_embeddings), verbose=False)
-        print(f"Mask Head - FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")
+        print(f"Mask Head - FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {time.time() - start_mask:.2f}")
 
+    start = time.time()
     mask = model(image1, image2, prompts).to(device)
+    last = time.time()
     print(mask.shape)
     print(mask)
 
     # 总FLOPs
     total_flops, total_params = profile(model, inputs=(image1, image2, prompts), verbose=False)
-    print(f"Total Model - FLOPs: {total_flops / 1e9:.2f} G, Params: {total_params / 1e6:.2f} M")
+    print(f"encoder FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {(last - start):.2f} s")
+

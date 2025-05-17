@@ -8,6 +8,7 @@
 @Desc    : 建筑物变化检测数据
 @Usage   :
 """
+import logging
 import os
 import random
 import re
@@ -104,7 +105,7 @@ class Building(Dataset):
     def _load_prompts(self):
         """读取 prompts.txt 文件并存储提示信息"""
         if not os.path.exists(self.prompts_path):
-            print(f"prompts.txt 文件不存在：{self.prompts_path}")
+            logging.warning(f"prompts.txt 文件不存在：{self.prompts_path}")
             return
 
         with open(self.prompts_path, 'r', encoding='utf-8') as f:
