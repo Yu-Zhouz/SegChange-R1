@@ -9,3 +9,5 @@ tensorboardX
 scikit-learn
 einops
 pandas
+gradio
+rasterio

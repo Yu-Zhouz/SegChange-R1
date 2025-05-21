@@ -104,6 +104,13 @@ python test.py -c ./configs/config.yaml
 python inference.py -c ./configs/config.yaml
 ```
 
+## app demo
+
+```bash
+cd examples/gradio_app
+chmod +x ./run.sh
+bash run.sh
+```
 ## 贡献
 
 欢迎提交问题和代码改进。请确保遵循项目的代码风格和贡献指南。

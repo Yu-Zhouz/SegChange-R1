@@ -2,41 +2,42 @@
 """
 @Project : SegChange-R1
 @FileName: inference.py
-@Time    : 2025/4/24 下午5:24
+@Time    : 2025/5/20 下午2:51
 @Author  : ZhouFei
 @Email   : zhoufei.net@gmail.com
 @Desc    : 测试建筑物变化检测模型
 @Usage   :
 """
-import argparse
 import time
-
 import cv2
+import math
 import torch
 import numpy as np
 import os
-
 from PIL import Image
-from torchvision.transforms import functional as F
-from torchvision.transforms import Compose, ToTensor, Normalize, ColorJitter, GaussianBlur
+from torchvision.transforms import Compose, ToTensor, Normalize
 from models import build_model
-from utils import load_config, setup_logging, get_output_dir
-from tqdm import tqdm  # 引入tqdm包用于进度显示
+from utils import setup_logging, get_output_dir
+from tqdm import tqdm
+import rasterio
+import numpy as np
 
 
-def get_args_config():
-    """
-    参数包括了: input_dir weights_dir output_dir threshold
-    """
-    parser = argparse.ArgumentParser('SegChange')
-    parser.add_argument('-c', '--config', type=str, required=True, help='The path of config file')
-    args = parser.parse_args()
-    if args.config is not None:
-        cfg = load_config(args.config)
-    else:
-        raise ValueError('Please specify the config file')
-    return cfg
+def read_image_in_chunks(image_path, chunk_size=25600):
+    with rasterio.open(image_path) as src:
+        width = src.width
+        height = src.height
+        meta = src.meta
 
+        chunks = []
+        for y in range(0, height, chunk_size):
+            for x in range(0, width, chunk_size):
+                window = rasterio.windows.Window(x, y, chunk_size, chunk_size)
+                chunk = src.read(window=window)
+                chunk = np.transpose(chunk, (1, 2, 0))  # HWC 格式
+                chunks.append((x, y, chunk))
+
+        return chunks, (height, width)
 
 def load_model(cfg):
     """
@@ -56,7 +57,7 @@ def load_model(cfg):
     return model
 
 
-def crop_image(img_a, img_b, coord, crop_size=512, overlap=256):
+def crop_image(img_a, img_b, coord, crop_size=512, overlap=0):
     """
     裁剪图像函数
     Args:
@@ -88,6 +89,45 @@ def crop_image(img_a, img_b, coord, crop_size=512, overlap=256):
     return cropped_img_a, cropped_img_b
 
 
+def calculate_brightness(img):
+    """
+    计算图像的平均亮度
+    Args:
+        img: 输入图像（numpy array）
+    Returns:
+        brightness: 图像的平均亮度
+    """
+    # 将图像转换为灰度图
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # 计算平均亮度
+    brightness = np.mean(gray)
+    return brightness
+
+
+def gamma_correction(img, target_brightness=128):
+    """
+    伽马矫正函数，动态调整伽马值
+    Args:
+        img: 输入图像（numpy array）
+        target_brightness: 目标亮度，默认为 128
+    Returns:
+        img: 经过伽马矫正的图像
+    """
+    # 计算当前图像的平均亮度
+    current_brightness = calculate_brightness(img)
+    # 计算伽马值
+    gamma = 1.0
+    if current_brightness > 0:
+        gamma = math.log(target_brightness, 2) / math.log(current_brightness, 2)
+    # 将图像归一化到 [0, 1] 范围
+    img = img.astype(np.float32) / 255.0
+    # 应用伽马矫正
+    img = np.power(img, gamma)
+    # 将图像恢复到 [0, 255] 范围
+    img = (img * 255).astype(np.uint8)
+    return img
+
+
 def preprocess_image(img_a, img_b, device):
     """
     预处理图像函数
@@ -99,28 +139,37 @@ def preprocess_image(img_a, img_b, device):
         img_a_tensor: torch.Tensor，处理后的第一期图像
         img_b_tensor: torch.Tensor，处理后的第二期图像
     """
+    # 对图像进行伽马矫正
+    # img_a = gamma_correction(img_a)
+    # img_b = gamma_correction(img_b)
+
+    # 定义图像预处理变换
     transform = Compose([
-        ToTensor(),
-        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ToTensor(),  # 将图像转换为 PyTorch 张量
+        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),  # 归一化图像
     ])
+
+    # 应用图像预处理变换
     img_a = transform(img_a)
     img_b = transform(img_b)
 
+    # 添加批次维度并移动到指定设备
     img_a = img_a.unsqueeze(0).to(device)
     img_b = img_b.unsqueeze(0).to(device)
 
     return img_a, img_b
 
 
-def postprocess_mask(mask):
+def postprocess_mask(mask, area_threshold=900):
     """
     mask后处理函数
-        1.实现50*50的mask区域过滤，只需要满足高或宽小于50即过滤掉
-        2.区域连通处理，例如有些分割区域中间有没分割的区域，则将其变为分割区域，形成一个连通区域
+        1. 实现像素面积过滤，分割区域像素面积小于1000像素则舍弃
+        2. 区域连通处理，确保分割区域连通
     Args:
         mask: 推理得到的分割掩码
     Returns:
         mask: 处理后的分割掩码
+        :param area_threshold:
     """
     # 创建一个空数组，用于存储处理后的结果
     result_mask = np.zeros_like(mask)
@@ -133,15 +182,11 @@ def postprocess_mask(mask):
         # 获取当前区域的坐标
         coords = np.column_stack(np.where(labels == label))
 
-        # 计算区域的高度和宽度
-        y_coords = coords[:, 0]
-        x_coords = coords[:, 1]
+        # 计算区域的像素面积
+        area = coords.shape[0]
 
-        height = np.max(y_coords) - np.min(y_coords) + 1
-        width = np.max(x_coords) - np.min(x_coords) + 1
-
-        # 如果区域的高度大于等于50或者宽度大于等于50，则保留该区域
-        if height >= 50 or width >= 50:
+        # 如果区域的像素面积大于等于area_threshold，则保留该区域
+        if area >= area_threshold:
             result_mask[labels == label] = 255
 
     # 对结果进行连通区域处理，确保分割区域连通
@@ -157,7 +202,8 @@ def postprocess_mask(mask):
     return filled_mask
 
 
-def slide_window_inference(model, img_a, img_b, device, output_dir, crop_size=512, overlap=0):
+
+def slide_window_inference(model, img_a, img_b, prompts, device, output_dir, crop_size=512, overlap=0, global_coord_offset=None):
     """
     滑动窗口推理函数
     Args:
@@ -168,6 +214,7 @@ def slide_window_inference(model, img_a, img_b, device, output_dir, crop_size=51
         output_dir: 输出目录
         crop_size: 裁剪窗口大小
         overlap: 裁剪窗口的重叠区域
+        global_coord_offset: 全局坐标偏移量，用于分块推理时的命名
     Returns:
         mask: 推理得到的分割掩码
     """
@@ -208,7 +255,7 @@ def slide_window_inference(model, img_a, img_b, device, output_dir, crop_size=51
 
             # 推理
             with torch.no_grad():
-                outputs = model(img_a_tensor, img_b_tensor)
+                outputs = model(img_a_tensor, img_b_tensor, prompts)
                 preds = (torch.sigmoid(outputs) > 0.5).float().squeeze(1).cpu().numpy()
 
             # 提取掩码
@@ -216,11 +263,18 @@ def slide_window_inference(model, img_a, img_b, device, output_dir, crop_size=51
 
             # mask后处理
             mask = postprocess_mask(mask)
+
             # 将结果保存到指定目录
             mask_dir = os.path.join(output_dir, 'masks')
             os.makedirs(mask_dir, exist_ok=True)
-            # mask_path = os.path.join(mask_dir, f"{x}_{y}.jpg")
-            # cv2.imwrite(mask_path, mask)
+
+            # 使用全局坐标偏移量来命名文件
+            if global_coord_offset:
+                global_x = global_coord_offset[0] + x
+                global_y = global_coord_offset[1] + y
+                combined_path = os.path.join(mask_dir, f"{global_x}_{global_y}_combined.jpg")
+            else:
+                combined_path = os.path.join(mask_dir, f"{x}_{y}_combined.jpg")
 
             # 绘制mask边界
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -245,8 +299,7 @@ def slide_window_inference(model, img_a, img_b, device, output_dir, crop_size=51
             combined_pil.paste(img_b_pil, (img_a_pil.width, 0))
             combined_pil.paste(mask_pil, (img_a_pil.width + img_b_pil.width, 0))
 
-            # 构建路径并保存
-            combined_path = os.path.join(mask_dir, f"{x}_{y}_combined.jpg")
+            # 保存拼接后的图像
             combined_pil.save(combined_path)
 
             # 将结果融合到最终掩码
@@ -265,61 +318,83 @@ def slide_window_inference(model, img_a, img_b, device, output_dir, crop_size=51
 
 
 def predict(cfg):
-    """
-    推理结果
-    Args:
-        cfg: 配置文件
-    Returns:
-        mask: 预测结果
-    """
     output_dir = get_output_dir(cfg.infer.output_dir, cfg.infer.name)
     logger = setup_logging(cfg, output_dir)
     logger.info('Inference Log %s' % time.strftime("%c"))
     input_dir = cfg.infer.input_dir
+    prompts = [cfg.additional_text] if hasattr(cfg, 'additional_text') else ['Buildings with changes']
 
-    # 初始化变量来存储 a 和 b 图像的路径及对应的数字
     filename = [filename for filename in os.listdir(input_dir) if filename.endswith('.tif')]
-    # 对filename列表进行排序
     filename = sorted(filename)
     a_image_path = os.path.join(input_dir, filename[0])
     b_image_path = os.path.join(input_dir, filename[1])
-    # 如果没有找到合适的 a 或 b 图像，抛出错误
+
     if a_image_path is None or b_image_path is None:
         logger.error("No suitable a or b image found.")
 
-    # 读取图像
-    img_a = cv2.imread(a_image_path)
-    img_b = cv2.imread(b_image_path)
+    # 判断是否启用分块处理
+    chunk_size = getattr(cfg.infer, 'chunk_size', 0)
+    use_chunking = chunk_size > 0
 
-    # 确保两幅图像大小一致
-    print(img_a.shape, img_b.shape)
-    if img_a.shape != img_b.shape:
-        logger.warning(f"Warning: Image sizes differ. Resizing image b {img_b.shape} to match a {img_a.shape}")
-        img_b = cv2.resize(img_b, (img_a.shape[1], img_a.shape[0]))
+    if use_chunking:
+        logger.info(f"Using chunked inference with chunk_size={chunk_size} and overlap=0")
 
-    # 将BGR修改为RGB
-    img_a = cv2.cvtColor(img_a, cv2.COLOR_BGR2RGB)
-    img_b = cv2.cvtColor(img_b, cv2.COLOR_BGR2RGB)
+        # 分块读取图像
+        a_chunks, (a_height, a_width) = read_image_in_chunks(a_image_path, chunk_size)
+        b_chunks, (b_height, b_width) = read_image_in_chunks(b_image_path, chunk_size)
 
-    # 加载模型
-    model = load_model(cfg)
+        logger.info(f"a_chunks: {len(a_chunks)}, b_chunks: {len(b_chunks)}, a_size: {a_height, a_width}, b_size: {b_height, b_width}")
+        # 创建空掩码用于最终结果
+        result_mask = np.zeros((a_height, a_width), dtype=np.uint8)
+        count_mask = np.zeros_like(result_mask)
 
-    # 添加推理进度条
-    print("Starting inference...")
-    mask = slide_window_inference(model, img_a, img_b, cfg.infer.device, output_dir)
+        # 加载模型
+        model = load_model(cfg)
+
+        print("Starting chunk-based inference...")
+
+        # 遍历每个块进行推理
+        for (x_a, y_a, img_a_patch), (x_b, y_b, img_b_patch) in zip(a_chunks, b_chunks):
+            # 确保两幅图像总大小一致
+            if img_a_patch.shape != img_b_patch.shape:
+                logger.warning(f"Warning: Image sizes differ. Resizing image b to match a.")
+                img_b_patch = cv2.resize(img_b_patch, (img_a_patch.shape[1], img_a_patch.shape[0]))
+
+            # 推理
+            with torch.no_grad():
+                mask = slide_window_inference(model, img_a_patch, img_b_patch, prompts, cfg.infer.device, output_dir, global_coord_offset=(x_a, y_a))
+
+            # 合并到最终掩码
+            result_mask[y_a:y_a + mask.shape[0], x_a:x_a + mask.shape[1]] += mask
+            count_mask[y_a:y_a + mask.shape[0], x_a:x_a + mask.shape[1]] += 1
+
+        # 平均融合
+        result_mask = (result_mask / count_mask).astype(np.uint8)
+
+    else:
+        logger.info("Using full-image inference")
+        # 读取图像
+        img_a = cv2.imread(a_image_path)
+        img_b = cv2.imread(b_image_path)
+
+        # 确保两幅图像大小一致
+        if img_a.shape != img_b.shape:
+            logger.warning(f"Warning: Image sizes differ. Resizing image b {img_b.shape} to match a {img_a.shape}")
+            img_b = cv2.resize(img_b, (img_a.shape[1], img_a.shape[0]))
+
+        # 将BGR修改为RGB
+        img_a = cv2.cvtColor(img_a, cv2.COLOR_BGR2RGB)
+        img_b = cv2.cvtColor(img_b, cv2.COLOR_BGR2RGB)
+
+        # 加载模型
+        model = load_model(cfg)
+
+        # 推理
+        print("Starting full-image inference...")
+        result_mask = slide_window_inference(model, img_a, img_b, prompts, cfg.infer.device, output_dir)
 
     # 保存最终掩码为 tif 格式
     output_path = os.path.join(output_dir, "result_mask.tif")
-    cv2.imwrite(output_path, mask)
+    cv2.imwrite(output_path, result_mask)
 
     logger.info("✅ 图像推理完成！")
-    return mask
-
-
-def main():
-    cfg = get_args_config()
-    mask = predict(cfg)
-
-
-if __name__ == "__main__":
-    main()

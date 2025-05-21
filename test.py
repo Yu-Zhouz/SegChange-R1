@@ -8,44 +8,15 @@
 @Desc    : 测试建筑物变化检测模型
 @Usage   :
 """
-import time
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from dataloader import Building
-from engines import evaluate_model
+from engines import evaluate_model, load_model
 from models import build_model
-import argparse
-import pprint
-from utils import load_config, get_output_dir, setup_logging
-
-
-def get_args_config():
-    parser = argparse.ArgumentParser('SegChange')
-    parser.add_argument('-c', '--config', type=str, required=True, help='The path of config file')
-    args = parser.parse_args()
-    if args.config is not None:
-        cfg = load_config(args.config)
-    else:
-        raise ValueError('Please specify the config file')
-    return cfg
-
-
-import argparse
 import pprint
 import time
-from utils import load_config, get_output_dir, setup_logging
-
-
-def get_args_config():
-    parser = argparse.ArgumentParser('SegChange')
-    parser.add_argument('-c', '--config', type=str, required=True, help='The path of config file')
-    args = parser.parse_args()
-    if args.config is not None:
-        cfg = load_config(args.config)
-    else:
-        raise ValueError('Please specify the config file')
-    return cfg
+from utils import get_args_config, get_output_dir, setup_logging
 
 
 def main():
@@ -57,15 +28,7 @@ def main():
     logger.info(pprint.pformat(cfg.__dict__))
     device = cfg.test.device
 
-    # Build model
-    model = build_model(cfg, training=False)
-    model.to(device)
-
-    # Load weights
-    weight_path = cfg.test.weight_path
-    logger.info(f'Loading weights from {weight_path}')
-    checkpoint = torch.load(weight_path, map_location=device)
-    model.load_state_dict(checkpoint['model'])
+    model = load_model(cfg)
 
     # Build test dataset
     transform = transforms.Compose([

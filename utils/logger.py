@@ -8,9 +8,25 @@
 @Desc    :
 @Usage   :
 """
+import argparse
 import logging
 import os
 from datetime import datetime
+from utils import load_config
+
+
+def get_args_config():
+    """
+    参数包括了: input_dir weights_dir output_dir threshold
+    """
+    parser = argparse.ArgumentParser('SegChange')
+    parser.add_argument('-c', '--config', type=str, required=True, help='The path of config file')
+    args = parser.parse_args()
+    if args.config is not None:
+        cfg = load_config(args.config)
+    else:
+        raise ValueError('Please specify the config file')
+    return cfg
 
 
 def setup_logging(cfg, log_dirs):

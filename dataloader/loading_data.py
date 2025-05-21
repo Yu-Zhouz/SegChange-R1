@@ -53,7 +53,7 @@ if __name__ == '__main__':
     from utils import load_config
 
     cfg = load_config("../configs/config.yaml")
-    cfg.data_root = '../data'
+    cfg.data_root = '../data/change'
     train_dataset, val_dataset = loading_data(cfg)
 
     print('训练集样本数：', len(train_dataset))

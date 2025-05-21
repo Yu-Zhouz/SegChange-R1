@@ -6,7 +6,7 @@ num_workers: 8
 resume: null  # 如果存在，则恢复训练
 data_root: ./data/change
 data_format: 'custom'  # [default, custom]
-additional_text: 'Buildings with changes, Arable land changes, site changes, woodland changes.'
+additional_text: 'Buildings with changes, Arable land changes, Changes in industrial land use, woodland changes.'
 
 data:
   transform: true
@@ -52,7 +52,8 @@ training:
   scheduler: 'step'  # [step, plateau]
   lr: 0.0001
   lr_backbone: 0.00001
-  lr_drop: 200
+  lr_drop: 20
+  weight_decay: 0.0001
   batch_size: 4
   eval_freq: 1
   start_eval: 1
@@ -70,9 +71,10 @@ test:
   show_overlay: False
 
 infer:
-  name: 'infer'
-  input_dir:  './data/tif'
-  weights_dir: './work_dirs/train_3/checkpoints/best_iou.pth'
+  name: 'infer_BL2_100'
+  input_dir:  './data/BL2_100'
+  chunk_size: 25600
+  weights_dir: './work_dirs/train_0/checkpoints/best_iou.pth'
   output_dir: './outputs'
   threshold: 0.5
   device: 'cuda:1'

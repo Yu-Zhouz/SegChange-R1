@@ -8,7 +8,6 @@
 @Desc    : 建筑物变化检测训练
 @Usage   :
 """
-import argparse
 import pandas as pd
 import os
 import pprint
@@ -26,17 +25,6 @@ from models import build_model
 from utils import *
 
 warnings.filterwarnings('ignore')
-
-
-def get_args_config():
-    parser = argparse.ArgumentParser('SegChange')
-    parser.add_argument('-c', '--config', type=str, required=True, help='The path of config file')
-    args = parser.parse_args()
-    if args.config is not None:
-        cfg = load_config(args.config)
-    else:
-        raise ValueError('Please specify the config file')
-    return cfg
 
 
 def main():
@@ -80,7 +68,7 @@ def main():
         },
     ]
 
-    optimizer = torch.optim.Adam(param_dicts, lr=cfg.training.lr)
+    optimizer = torch.optim.AdamW(param_dicts, lr=cfg.training.lr, weight_decay=cfg.training.weight_decay)
     lr_scheduler = None
     # 配置学习率调度器
     if cfg.training.scheduler == 'step':
