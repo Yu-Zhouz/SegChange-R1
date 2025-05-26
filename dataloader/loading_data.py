@@ -24,27 +24,10 @@ class DeNormalize(object):
 
 
 def loading_data(cfg):
-    if cfg.data.transform:
-        a_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])
-
-        b_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])
-    else:
-        a_transform = None
-        b_transform = None
-
-    train_dataset = Building(cfg.data_root,
-                             a_transform=a_transform,
-                             b_transform=b_transform,
-                             train=True,
-                             data_format=cfg.data_format,
-                             **cfg.data.to_dict())
-    val_dataset = Building(cfg.data_root, a_transform=a_transform, b_transform=b_transform, train=False, data_format=cfg.data_format)
+    data_root = cfg.data.data_root
+    data_format = cfg.data.data_format
+    train_dataset = Building(data_root, train=True, data_format=data_format, **cfg.data.transforms.to_dict())
+    val_dataset = Building(data_root, train=False, data_format=data_format)
     return train_dataset, val_dataset
 
 
@@ -53,7 +36,7 @@ if __name__ == '__main__':
     from utils import load_config
 
     cfg = load_config("../configs/config.yaml")
-    cfg.data_root = '../data/change'
+    cfg.data.data_root = '../data/change'
     train_dataset, val_dataset = loading_data(cfg)
 
     print('训练集样本数：', len(train_dataset))

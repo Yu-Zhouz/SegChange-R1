@@ -17,6 +17,7 @@ from PIL import Image
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 from sklearn.metrics import precision_score, recall_score, f1_score, jaccard_score, accuracy_score
+from models import build_embs
 
 
 def train(cfg, model, criterion, dataloader, optimizer, device, epoch):
@@ -31,10 +32,12 @@ def train(cfg, model, criterion, dataloader, optimizer, device, epoch):
         for images_a, images_b, prompt, labels in pbar:
             images_a = images_a.to(device)
             images_b = images_b.to(device)
+            embs = build_embs(prompts=prompt, text_encoder_name=cfg.model.text_encoder_name,
+                              freeze_text_encoder=cfg.model.freeze_text_encoder, device=device)
             labels = labels.to(device)
 
             optimizer.zero_grad()
-            outputs = model(images_a, images_b, prompt)
+            outputs = model(images_a, images_b, embs)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -62,7 +65,7 @@ def train(cfg, model, criterion, dataloader, optimizer, device, epoch):
     return {'loss': epoch_loss, 'oa': epoch_oa}
 
 
-def evaluate(cfg, model, criterion, dataloader, device, epoch):
+def evaluate(cfg, model, criterion, postprocessor, dataloader, device, epoch):
     model.eval()
     total_loss = 0.0
     total_samples = 0
@@ -73,9 +76,11 @@ def evaluate(cfg, model, criterion, dataloader, device, epoch):
         for images_a, images_b, prompt, labels in pbar:
             images_a = images_a.to(device)
             images_b = images_b.to(device)
+            embs = build_embs(prompts=prompt, text_encoder_name=cfg.model.text_encoder_name,
+                              freeze_text_encoder=cfg.model.freeze_text_encoder, device=device)
             labels = labels.to(device)
 
-            outputs = model(images_a, images_b, prompt)
+            outputs = model(images_a, images_b, embs)
             loss = criterion(outputs, labels)
             total_loss += loss.item() * images_a.size(0)
             total_samples += images_a.size(0)
@@ -85,6 +90,9 @@ def evaluate(cfg, model, criterion, dataloader, device, epoch):
                 preds = (torch.sigmoid(outputs) > cfg.training.threshold).float().squeeze(1).cpu().numpy()
             else:
                 preds = torch.argmax(outputs, dim=1).cpu().numpy()
+            # TODO: 后处理PostProcessor
+            # post_preds, _ = postprocessor(preds)
+
             labels = labels.cpu().numpy()
             all_preds.extend(preds.flatten())
             all_labels.extend(labels.flatten())
@@ -123,7 +131,7 @@ def evaluate(cfg, model, criterion, dataloader, device, epoch):
     return metrics
 
 
-def evaluate_model(cfg, model, dataloader, device, output_dir):
+def evaluate_model(cfg, model, postprocessor, dataloader, device, output_dir):
     model.eval()
     all_preds = []
     all_labels = []
@@ -136,15 +144,19 @@ def evaluate_model(cfg, model, dataloader, device, output_dir):
         for images_a, images_b, prompt, labels in pbar:
             images_a = images_a.to(device)
             images_b = images_b.to(device)
+            embs = build_embs(prompts=prompt, text_encoder_name=cfg.model.text_encoder_name,
+                              freeze_text_encoder=cfg.model.freeze_text_encoder, device=device)
             labels = labels.to(device)
 
-            outputs = model(images_a, images_b, prompt)
+            outputs = model(images_a, images_b, embs)
 
             # Store predictions and labels
             if cfg.model.num_classes == 1:
                 preds = (torch.sigmoid(outputs) > cfg.test.threshold).float().squeeze(1).cpu().numpy()
             else:
                 preds = torch.argmax(outputs, dim=1).cpu().numpy()
+            # TODO: 后处理PostProcessor
+            # post_preds, _ = postprocessor(preds)
             labels_np = labels.cpu().numpy()
 
             all_preds.extend(preds.flatten())
@@ -152,8 +164,8 @@ def evaluate_model(cfg, model, dataloader, device, output_dir):
 
             # Optional: save predicted image and comparison image
             if cfg.test.show:
-                pred_save_dir = os.path.join(output_dir, 'predictions')
-                os.makedirs(pred_save_dir, exist_ok=True)
+                # pred_save_dir = os.path.join(output_dir, 'predictions')
+                # os.makedirs(pred_save_dir, exist_ok=True)
 
                 # 根据类别数量选择颜色映射
                 if cfg.model.num_classes == 1:
@@ -170,8 +182,8 @@ def evaluate_model(cfg, model, dataloader, device, output_dir):
                     pred_img = Image.fromarray(pred_img[:, :, :3])  # 只取 RGB 通道
 
                 # 保存预测图像
-                save_path = os.path.join(pred_save_dir, f'{pbar.n}_pred.png')
-                pred_img.save(save_path)
+                # save_path = os.path.join(pred_save_dir, f'{pbar.n}_pred.png')
+                # pred_img.save(save_path)
 
                 # 可选：保存带掩码的图像（将预测结果叠加到原始图像上）
                 if cfg.test.show_overlay:

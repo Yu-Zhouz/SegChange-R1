@@ -11,7 +11,7 @@
     <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
       <option name="ignoredPackages">
         <value>
-          <list size="105">
+          <list size="108">
             <item index="0" class="java.lang.String" itemvalue="protobuf" />
             <item index="1" class="java.lang.String" itemvalue="tensorboard" />
             <item index="2" class="java.lang.String" itemvalue="thop" />
@@ -117,6 +117,9 @@
             <item index="102" class="java.lang.String" itemvalue="mmcls" />
             <item index="103" class="java.lang.String" itemvalue="mmrotate" />
             <item index="104" class="java.lang.String" itemvalue="sympy" />
+            <item index="105" class="java.lang.String" itemvalue="calflops" />
+            <item index="106" class="java.lang.String" itemvalue="faster-coco-eval" />
+            <item index="107" class="java.lang.String" itemvalue="loguru" />
           </list>
         </value>
       </option>
@@ -137,13 +140,6 @@
           <option value="N806" />
           <option value="N812" />
           <option value="N803" />
-        </list>
-      </option>
-    </inspection_tool>
-    <inspection_tool class="PyUnresolvedReferencesInspection" enabled="true" level="WARNING" enabled_by_default="true">
-      <option name="ignoredIdentifiers">
-        <list>
-          <option value="dict.*" />
         </list>
       </option>
     </inspection_tool>

@@ -24,12 +24,21 @@ class LinearAttention(nn.Module):
     def forward(self, x):
         B, N, C = x.shape
         qkv = self.to_qkv(x).chunk(3, dim=-1)
-        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=self.heads), qkv)
+
+        # 显式 reshape
+        B, N, _ = qkv[0].shape
+        h = self.heads
+        d = _ // h
+
+        q = qkv[0].view(B, N, h, d).transpose(1, 2)  # B, h, N, d
+        k = qkv[1].view(B, N, h, d).transpose(1, 2)
+        v = qkv[2].view(B, N, h, d).transpose(1, 2)
         q = q * self.scale
         k = k.softmax(dim=-1)
         context = torch.einsum('b h n d, b h n e -> b h d e', k, v)
         out = torch.einsum('b h n d, b h d e -> b h n e', q, context)
-        out = rearrange(out, 'b h n d -> b n (h d)')
+        out = out.transpose(1, 2).contiguous()  # B, N, h, d
+        out = out.view(B, N, -1)  # B, N, h*d
         return self.to_out(out)
 
 

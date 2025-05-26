@@ -75,7 +75,7 @@ if __name__ == '__main__':
     import torch
     from utils import load_config
 
-    cfg = load_config('../configs/config.yaml')
+    cfg = load_config('../../configs/config.yaml')
     # 测试Swin Transformer
     cfg.model.backbone_name = 'swin_base_patch4_window7_224'
     model_swin = VisualEncoder(cfg)

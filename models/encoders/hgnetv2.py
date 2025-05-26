@@ -860,7 +860,7 @@ class HGNetv2(nn.Module):
 
 # Example usage
 if __name__ == "__main__":
-    model = HGNetv2(name="B0", use_lab=True, return_idx=[0, 1, 2, 3])
+    model = HGNetv2(name="B5", use_lab=False, return_idx=[0, 1, 2, 3])
     input_tensor = torch.randn(1, 3, 512, 640)
     output = model(input_tensor)
     for feature_map in output:

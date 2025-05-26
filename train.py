@@ -21,7 +21,7 @@ import warnings
 from tensorboardX import SummaryWriter
 from dataloader import build_dataset
 from engines import train, evaluate
-from models import build_model
+from models import build_model, PostProcessor
 from utils import *
 
 warnings.filterwarnings('ignore')
@@ -53,6 +53,8 @@ def main():
             loss.to(device)
     else:
         criterion.to(device)
+
+    postprocessor = PostProcessor(min_area=2500, max_p_a_ratio=10, min_convexity=0.8)
 
     model_without_ddp = model
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -158,7 +160,7 @@ def main():
         if epoch % cfg.training.eval_freq == 0 and epoch >= cfg.training.start_eval:
             t1 = time.time()
             # 假设 evaluate 函数返回 precision、recall、f1、iou、accuracy
-            metrics = evaluate(cfg, model, criterion, dataloader_val, device, epoch)
+            metrics = evaluate(cfg, model, criterion, postprocessor, dataloader_val, device, epoch)
             t2 = time.time()
             if cfg.training.scheduler == 'plateau':
                 lr_scheduler.step(metrics['loss'])  # 根据验证损失调整学习率
