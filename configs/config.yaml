@@ -68,7 +68,7 @@ test:
   device: 'cuda:1'
   save_dir: "./work_dirs"
   name: "test"
-  weights_dir: './work_dirs/train/checkpoints/best_iou.pth'
+  weights_dir: './work_dirs/train_0/checkpoints/best_iou.pth'
   show: True
   show_overlay: False
 
@@ -76,7 +76,7 @@ infer:
   name: 'BL2_5'
   input_dir: '/data/BL2_5'
   chunk_size: 0  # 25600
-  weights_dir: './work_dirs/train/checkpoints/best_iou.pth'
+  weights_dir: './work_dirs/train_0/checkpoints/best_iou.pth'
   output_dir: './outputs'
   threshold: 0.5
   device: 'cuda:1'
