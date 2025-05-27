@@ -82,13 +82,15 @@ class PerformanceMonitor:
     def __init__(self, logger):
         self.logger = logger
         self.start_time = time.time()
+        self.total_chunks = 0     # 总块数
+        self.current_chunk = 0    # 当前正在处理的块索引
         self.crop_times = deque(maxlen=100)  # 保留最近100个切片时间
         self.inference_times = deque(maxlen=100)  # 保留最近100个推理时间
-        self.total_windows = 0  # 统一使用total_windows
-        self.completed_windows = 0  # 统一使用completed_windows
+        self.total_crop = 0  # 统一使用total_crop
+        self.completed_crop = 0  # 统一使用completed_crop
         self.total_batches = 0
         self.completed_batches = 0
-        self.lock = threading.Lock()
+        self.lock = threading.Lock()  # 创建锁对象
 
     def add_crop_time(self, crop_time: float):
         with self.lock:
@@ -97,12 +99,12 @@ class PerformanceMonitor:
     def add_inference_time(self, inference_time: float, batch_size: int = 1):
         with self.lock:
             self.inference_times.append(inference_time)
-            self.completed_windows += batch_size
+            self.completed_crop += batch_size
             self.completed_batches += 1
 
-    def set_total_windows(self, total: int):
+    def set_total_crop(self, total: int):
         with self.lock:
-            self.total_windows = total
+            self.total_crop = total
 
     def set_total_batches(self, total: int):
         with self.lock:
@@ -119,15 +121,23 @@ class PerformanceMonitor:
     def get_elapsed_time(self) -> float:
         return time.time() - self.start_time
 
-    def get_remaining_windows(self) -> int:
+    def get_remaining_crop(self) -> int:
         with self.lock:
-            return max(0, self.total_windows - self.completed_windows)
+            return max(0, self.total_crop - self.completed_crop)
 
     def get_completion_rate(self) -> float:
         with self.lock:
-            if self.total_windows == 0:
+            if self.total_crop == 0:
                 return 0.0
-            return (self.completed_windows / self.total_windows) * 100
+            return (self.completed_crop / self.total_crop) * 100
+
+    def set_total_chunks(self, total: int):
+        with self.lock:
+            self.total_chunks = total
+
+    def update_current_chunk(self, chunk_id: int):
+        with self.lock:
+            self.current_chunk = chunk_id
 
     @staticmethod
     def format_seconds(seconds):
@@ -137,7 +147,8 @@ class PerformanceMonitor:
 
     def log_progress(self, crop_queue_size: int, inference_queue_size: int):
         elapsed = self.format_seconds(self.get_elapsed_time())
-        remaining = self.get_remaining_windows()
+        total_chunks, chunk_ids = self.get_chunk_ids()
+        remaining = self.get_remaining_crop()
         avg_crop = self.get_avg_crop_time()
         avg_inference = self.get_avg_inference_time()
         completion_rate = self.get_completion_rate()
@@ -145,12 +156,13 @@ class PerformanceMonitor:
         with self.lock:
             self.logger.info(
                 f"进度监控 - 运行时间: {elapsed:.1f}s | "
+                f"块进度: {self.current_chunk}/{self.total_chunks} | " 
                 f"剩余切片: {remaining} | "
                 f"切片队列: {crop_queue_size} | "
                 f"推理队列: {inference_queue_size} | "
                 f"平均切片时间: {avg_crop:.6f}s | "
-                f"平均推理时间: {avg_inference:.6f}s | "
-                f"批次进度: {self.completed_batches}/{self.total_batches} | "
+                f"平均推理时间: {avg_inference:.3f}s | "
+                f"批进度: {self.completed_batches}/{self.total_batches} | "
                 f"完成率: {completion_rate:.1f}%"
             )
 
@@ -676,10 +688,14 @@ def save_visualization(task: WindowTask, mask: np.ndarray, output_dir: str):
 
 def async_slide_window_inference_optimized(img_a, img_b, session: ort.InferenceSession,
                                            embs: torch.Tensor, output_dir: str,
-                                           args, global_coord_offset=None):
+                                           args, chunks=(1, 0), global_coord_offset=None):
     """优化的异步滑窗批量推理"""
     logger = logging.getLogger()
     monitor = PerformanceMonitor(logger)
+
+    # 获取块信息
+    monitor.set_total_chunks(chunks[0])  # chunks 是 (total_chunks, chunk_idx)
+    monitor.update_current_chunk(chunks[1])
 
     # 记录初始内存状态
     logger.info(f"推理开始前内存状态: {get_memory_info()}")
@@ -708,13 +724,13 @@ def async_slide_window_inference_optimized(img_a, img_b, session: ort.InferenceS
 
     # 创建所有裁剪任务
     tasks = create_cropping_tasks(img_a, img_b, 512, 0, global_coord_offset)
-    monitor.set_total_windows(len(tasks))
+    monitor.set_total_crop(len(tasks))
 
     # 计算批次数量
     total_batches = (len(tasks) + args.batch_size - 1) // args.batch_size
     monitor.set_total_batches(total_batches)
 
-    logger.info(f"创建了 {len(tasks)} 个窗口任务，将分为 {total_batches} 个批次处理")
+    logger.info(f"创建了 {len(tasks)} 个切片任务，将分为 {total_batches} 个批次处理")
     logger.info(f"优化后批次大小: {args.batch_size}")
 
     # 启动工作线程 - 减少线程数以减少资源竞争
@@ -850,43 +866,50 @@ def predict_onnx(args):
     use_chunking = chunk_size > 0
 
     if use_chunking:
-        logger.info(f"使用分块推理，块大小: {chunk_size}")
+        logger.info(f"使用分块推理，块大小: {chunk_size}， 正在分块读取图像，等待中...")
+        time_start = time.time()
         a_chunks, (a_height, a_width) = read_image_in_chunks(a_image_path, chunk_size)
         b_chunks, (b_height, b_width) = read_image_in_chunks(b_image_path, chunk_size)
-
+        time_halfway = time.time()
         result_mask = np.zeros((a_height, a_width), dtype=np.uint8)
         count_mask = np.zeros_like(result_mask)
 
         total_chunks = len(a_chunks)
-        logger.info(f"总共有 {total_chunks} 个块需要处理")
+        logger.info(f"分块读取用时：{time_halfway - time_start:.2f} 秒，总共有 {total_chunks} 个块需要处理")
 
         for chunk_idx, ((x_a, y_a, img_a_patch), (x_b, y_b, img_b_patch)) in enumerate(zip(a_chunks, b_chunks)):
             logger.info(f"处理第 {chunk_idx + 1}/{total_chunks} 个块 (位置: {x_a}, {y_a})")
-
+            chunks = (total_chunks,  chunk_idx)
             if img_a_patch.shape != img_b_patch.shape:
                 img_b_patch = cv2.resize(img_b_patch, (img_a_patch.shape[1], img_a_patch.shape[0]))
 
             mask = async_slide_window_inference_optimized(img_a_patch, img_b_patch, session, embs,
-                                                          output_dir, args, (x_a, y_a))
+                                                          output_dir, args, chunks, (x_a, y_a))
 
             result_mask[y_a:y_a + mask.shape[0], x_a:x_a + mask.shape[1]] += mask
             count_mask[y_a:y_a + mask.shape[0], x_a:x_a + mask.shape[1]] += 1
 
         result_mask = (result_mask / np.clip(count_mask, 1, None)).astype(np.uint8)
+
+        time_last = time.time()
     else:
-        logger.info("使用全图推理")
+        logger.info("直接切片推理，正在读取图像，等待中...")
+        time_start = time.time()
         img_a = cv2.imread(a_image_path)
         img_b = cv2.imread(b_image_path)
         if img_a.shape != img_b.shape:
             img_b = cv2.resize(img_b, (img_a.shape[1], img_a.shape[0]))
         img_a = cv2.cvtColor(img_a, cv2.COLOR_BGR2RGB)
         img_b = cv2.cvtColor(img_b, cv2.COLOR_BGR2RGB)
+        time_halfway = time.time()
+        logger.info(f"读取图像用时：{time_halfway - time_start:.2f} 秒")
 
         result_mask = async_slide_window_inference_optimized(img_a, img_b, session, embs, output_dir, args)
+        time_last = time.time()
 
     output_path = os.path.join(output_dir, "result_mask.tif")
     cv2.imwrite(output_path, result_mask)
-    logger.info("✅ 异步图像推理完成！")
+    logger.info(f"✅ 异步图像推理完成！,读取耗时：{time_halfway-time_start:.2f} 秒,推理耗时：{time_last-time_halfway:.2f} 秒,总耗时：{time_last-time_start:.2f} 秒")
 
 
 if __name__ == "__main__":
