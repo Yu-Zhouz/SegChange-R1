@@ -85,12 +85,13 @@ def export_to_onnx(cfg):
         scripted_model,
         (image1, image2, embs),
         output_path,
-        export_params=True,          # 存储训练参数
-        opset_version=16,           # ONNX 算子集版本
-        do_constant_folding=True,   # 优化常量
-        input_names=input_names,    # 输入名称
-        output_names=output_names,  # 输出名称
-        dynamic_axes=dynamic_axes   # 动态维度
+        optimize_for_inference=True,  # 启用推理优化
+        export_params=True,           # 存储训练参数
+        opset_version=16,             # ONNX 算子集版本
+        do_constant_folding=True,     # 优化常量
+        input_names=input_names,      # 输入名称
+        output_names=output_names,    # 输出名称
+        dynamic_axes=dynamic_axes     # 动态维度
     )
 
     print(f"✅ 模型已成功导出为 ONNX 格式：{output_path}")

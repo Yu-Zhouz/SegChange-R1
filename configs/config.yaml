@@ -1,5 +1,5 @@
 name: 'train'
-device: 'cuda:0'
+device: 'cuda:1'
 seed: 42
 output_dir: ./work_dirs
 num_workers: 12

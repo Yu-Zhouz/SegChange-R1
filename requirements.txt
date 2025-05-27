@@ -18,3 +18,5 @@ scipy~=1.15.2
 thop~=0.1.1-2209072238
 pillow~=11.2.1
 tqdm~=4.67.1
+GPUtil
+psutil
