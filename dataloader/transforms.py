@@ -15,12 +15,14 @@ import random
 
 class TransformBase:
     """变换基类"""
+
     def apply(self, a_img, b_img, label):
         raise NotImplementedError("Subclass must implement abstract method")
 
 
 class Compose:
     """组合多个变换"""
+
     def __init__(self, transforms):
         self.transforms = transforms
 
@@ -32,6 +34,7 @@ class Compose:
 
 class ColorJitterTransform(TransformBase):
     """颜色扰动变换"""
+
     def __init__(self, color_jitter, apply_prob=0.5):
         self.color_jitter = color_jitter
         self.apply_prob = apply_prob
@@ -64,6 +67,7 @@ class ColorJitterTransform(TransformBase):
 
 class RotateTransform(TransformBase):
     """旋转变换"""
+
     def __init__(self, rotation_degree, apply_prob=0.5):
         self.rotation_degree = rotation_degree
         self.apply_prob = apply_prob
@@ -82,9 +86,9 @@ class RotateTransform(TransformBase):
         return a_img, b_img, label
 
 
-
 class GammaCorrectionTransform(TransformBase):
     """Gamma 校正变换"""
+
     def __init__(self, gamma_range):
         self.gamma_range = gamma_range
 
@@ -99,6 +103,7 @@ class GammaCorrectionTransform(TransformBase):
 
 class AffineTransform(TransformBase):
     """仿射变换"""
+
     def __init__(self, affine_degree, apply_prob=0.2):
         self.affine_degree = affine_degree
         self.apply_prob = apply_prob
@@ -121,9 +126,9 @@ class AffineTransform(TransformBase):
         return a_img, b_img, label
 
 
-
 class RandomEraseTransform(TransformBase):
     """随机擦除变换"""
+
     def __init__(self, erase_prob, erase_ratio):
         self.erase_prob = erase_prob
         self.erase_ratio = erase_ratio
@@ -160,6 +165,7 @@ class RandomEraseTransform(TransformBase):
 
 class GaussianBlurTransform(TransformBase):
     """高斯模糊变换"""
+
     def __init__(self, blur_sigma):
         self.blur_sigma = blur_sigma
 
@@ -174,6 +180,7 @@ class GaussianBlurTransform(TransformBase):
 
 class CLAHETransform(TransformBase):
     """直方图均衡化变换"""
+
     def __init__(self, apply_prob=0.5):
         self.apply_prob = apply_prob
 

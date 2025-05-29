@@ -604,6 +604,7 @@ def inference_worker_optimized(inference_queue: queue.Queue, result_queue: queue
                 }
 
                 outputs = session.run(None, inputs)
+                # TODO:threshold
                 batch_preds = (outputs[0] > 0.5).astype('uint8') * 255
 
                 # 处理批量结果

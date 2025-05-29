@@ -36,6 +36,7 @@ def get_args():
     parser.add_argument('--prompt', type=str, default=None, help='文本提示（如 Buildings with changes）')
     parser.add_argument('--chunk_size', type=int, default=0, help='分块大小（默认为 0 表示不分块）')
     parser.add_argument('--batch_size', type=int, default=1, help='批次大小')
+    parser.add_argument('--threshold', type=float, default=0.5, help='阈值用于二值化输出')
     parser.add_argument('--device', type=str, default='cuda', help='设备类型（cpu/cuda）')
 
     args = parser.parse_args()
@@ -323,7 +324,7 @@ def postprocess_mask(mask, area_threshold=2500, perimeter_area_ratio_threshold=1
     return result_mask, (min_area, max_ratio, min_convexity)
 
 
-def slide_window_inference_onnx(session, img_a, img_b, embs, output_dir, crop_size=512, overlap=0,
+def slide_window_inference_onnx(session, img_a, img_b, embs, output_dir, crop_size=512, overlap=0, threshold=0.5,
                                 global_coord_offset=None):
     height, width, _ = img_a.shape
     result_mask = np.zeros((height, width), dtype=np.uint8)
@@ -351,7 +352,7 @@ def slide_window_inference_onnx(session, img_a, img_b, embs, output_dir, crop_si
             }
 
             outputs = session.run(None, inputs)
-            preds = (outputs[0] > 0.5).astype('uint8') * 255
+            preds = (outputs[0] > threshold).astype('uint8') * 255
             mask = preds[0, 0]
 
             mask, _ = postprocess_mask(mask)
@@ -435,7 +436,7 @@ def predict_onnx(args):
         for (x_a, y_a, img_a_patch), (x_b, y_b, img_b_patch) in zip(a_chunks, b_chunks):
             if img_a_patch.shape != img_b_patch.shape:
                 img_b_patch = cv2.resize(img_b_patch, (img_a_patch.shape[1], img_a_patch.shape[0]))
-            mask = slide_window_inference_onnx(session, img_a_patch, img_b_patch, embs, output_dir,
+            mask = slide_window_inference_onnx(session, img_a_patch, img_b_patch, embs, output_dir, threshold,
                                                global_coord_offset=(x_a, y_a))
             result_mask[y_a:y_a + mask.shape[0], x_a:x_a + mask.shape[1]] += mask
             count_mask[y_a:y_a + mask.shape[0], x_a:x_a + mask.shape[1]] += 1
@@ -449,7 +450,7 @@ def predict_onnx(args):
         img_a = cv2.cvtColor(img_a, cv2.COLOR_BGR2RGB)
         img_b = cv2.cvtColor(img_b, cv2.COLOR_BGR2RGB)
 
-        result_mask = slide_window_inference_onnx(session, img_a, img_b, embs, output_dir)
+        result_mask = slide_window_inference_onnx(session, img_a, img_b, embs, output_dir, threshold)
 
     output_path = os.path.join(output_dir, "result_mask.tif")
     cv2.imwrite(output_path, result_mask)
