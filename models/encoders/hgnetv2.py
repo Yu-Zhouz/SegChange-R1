@@ -516,7 +516,7 @@ class HG_Block(nn.Module):
                     )
                 )
 
-        # feature aggregation
+        # neck aggregation
         total_chs = in_chs + layer_num * mid_chs
         if agg == "se":
             aggregation_squeeze_conv = ConvBNAct(

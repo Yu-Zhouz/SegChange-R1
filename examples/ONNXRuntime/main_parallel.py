@@ -147,7 +147,9 @@ class PerformanceMonitor:
 
     def log_progress(self, crop_queue_size: int, inference_queue_size: int):
         elapsed = self.format_seconds(self.get_elapsed_time())
-        total_chunks, chunk_ids = self.get_chunk_ids()
+        total_chunks = self.total_chunks
+        chunk_ids = self.current_chunk
+
         remaining = self.get_remaining_crop()
         avg_crop = self.get_avg_crop_time()
         avg_inference = self.get_avg_inference_time()
@@ -155,8 +157,8 @@ class PerformanceMonitor:
 
         with self.lock:
             self.logger.info(
-                f"进度监控 - 运行时间: {elapsed:.1f}s | "
-                f"块进度: {self.current_chunk}/{self.total_chunks} | " 
+                f"进度监控 - 运行时间: {elapsed}s | "
+                f"块进度: {chunk_ids}/{total_chunks} | " 
                 f"剩余切片: {remaining} | "
                 f"切片队列: {crop_queue_size} | "
                 f"推理队列: {inference_queue_size} | "
@@ -261,7 +263,7 @@ def create_optimized_onnx_session(model_path, device='cuda'):
         cuda_provider_options = {
             'device_id': 0,
             'arena_extend_strategy': 'kSameAsRequested',  # 按需分配显存
-            'gpu_mem_limit': 6 * 1024 * 1024 * 1024,  # 限制显存使用到6GB
+            'gpu_mem_limit': 16 * 1024 * 1024 * 1024,  # 限制显存使用到6GB
             'cudnn_conv_algo_search': 'EXHAUSTIVE',
             'do_copy_in_default_stream': True,
         }
@@ -879,7 +881,7 @@ def predict_onnx(args):
 
         for chunk_idx, ((x_a, y_a, img_a_patch), (x_b, y_b, img_b_patch)) in enumerate(zip(a_chunks, b_chunks)):
             logger.info(f"处理第 {chunk_idx + 1}/{total_chunks} 个块 (位置: {x_a}, {y_a})")
-            chunks = (total_chunks,  chunk_idx)
+            chunks = (total_chunks,  chunk_idx+1)
             if img_a_patch.shape != img_b_patch.shape:
                 img_b_patch = cv2.resize(img_b_patch, (img_a_patch.shape[1], img_a_patch.shape[0]))
 

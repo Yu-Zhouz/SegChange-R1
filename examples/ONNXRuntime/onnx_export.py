@@ -30,6 +30,7 @@ def export_to_onnx(cfg):
     model.to(device)
 
     # 加载权重并过滤掉多余的 key
+    print(f'加载模型权重所在地址：{cfg.infer.weights_dir}')
     if cfg.infer.weights_dir is not None:
         checkpoint = torch.load(cfg.infer.weights_dir, map_location=device)
 
