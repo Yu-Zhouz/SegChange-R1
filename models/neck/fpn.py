@@ -10,11 +10,14 @@
 """
 import torch
 import torch.nn as nn
-from models import TokenConnector, EGA
+from .token_mlp import TokenConnector
+from .ega import EGA
+from typing import List
 
 
 class FPNFeatureFuser(nn.Module):
-    def __init__(self, in_channels, fpn_out_channels=256, feature_strides=[4, 8, 16, 32], use_token_connector=False, use_ega=True):
+    def __init__(self, in_channels, fpn_out_channels=256, feature_strides=[4, 8, 16, 32], use_token_connector=False,
+                 use_ega=True):
         super().__init__()
         assert len(in_channels) == len(feature_strides), "通道数和stride数量必须一致"
         self.use_token_connector = use_token_connector
@@ -71,7 +74,8 @@ class FPNFeatureFuser(nn.Module):
 
 
 class LightweightFPN(nn.Module):
-    def __init__(self, in_channels, fpn_out_channels=256, feature_strides=[4, 8, 16, 32], use_token_connector=False, use_ega=True):
+    def __init__(self, in_channels, fpn_out_channels=256, feature_strides=[4, 8, 16, 32], use_token_connector=False,
+                 use_ega=True):
         super().__init__()
         self.use_token_connector = use_token_connector
         self.use_ega = use_ega  # 是否使用 EGA
@@ -87,27 +91,26 @@ class LightweightFPN(nn.Module):
             )
         self.fusion_conv = nn.Conv2d(fpn_out_channels * len(in_channels), fpn_out_channels, kernel_size=1)
 
-        # TokenConnector 放在最后
-        if self.use_token_connector:
-            self.token_connector = TokenConnector(fpn_out_channels, fpn_out_channels // 2)
+        # # TokenConnector 放在最后
+        # if self.use_token_connector:
+        #     self.token_connector = TokenConnector(fpn_out_channels, fpn_out_channels // 2)
 
         if self.use_ega:
             self.ega = EGA(channel=fpn_out_channels, size=3, sigma=1.0)
 
-    def forward(self, features):
+    def forward(self, features: List[torch.Tensor]):
         upsampled = [head(feat) for feat, head in zip(features, self.scale_heads)]
         merged = torch.cat(upsampled, dim=1)
         fused = self.fusion_conv(merged)
 
-        # TokenConnector
-        if self.use_token_connector:
-            fused = self.token_connector(fused)
+        # # TokenConnector
+        # if self.use_token_connector:
+        #     fused = self.token_connector(fused)
 
         if self.use_ega:
             fused = self.ega(fused)
 
         return fused
-
 
 
 if __name__ == '__main__':
@@ -117,12 +120,14 @@ if __name__ == '__main__':
                          torch.randn(2, 256, 16, 16).to('cuda')]
     fpn_feature_fuser = FPNFeatureFuser(in_channels=[256, 256, 256, 256]).to('cuda')
     import time
+
     start = time.time()
     fpn_feats = fpn_feature_fuser(multi_scale_feats)
     last = time.time()
     print(fpn_feats.shape)
 
     from thop import profile
+
     flops, params = profile(fpn_feature_fuser, inputs=(multi_scale_feats,))
     print(f"encoder FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {(last - start):.2f} s")
 
@@ -143,5 +148,6 @@ if __name__ == '__main__':
     last = time.time()
     print(fpn_feats.shape)
     from thop import profile
+
     flops, params = profile(light_fpn, inputs=(multi_scale_feats,))
     print(f"encoder FLOPs: {flops / 1e9:.2f} G, Params:  {params / 1e6:.2f} M, time: {(last - start):.2f} s")

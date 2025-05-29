@@ -10,9 +10,8 @@
 """
 from torch import nn
 import torch
-from models import MaskHead, DualInputVisualEncoder, FeatureDiffModule, TextEncoderBert, TextEncoderLLM, \
-    FPNFeatureFuser, LightweightFPN
-from models.losses import TotalLoss
+from models import MaskHead, FeatureDiffModule, FPNFeatureFuser, LightweightFPN, DualInputVisualEncoder, TotalLoss, \
+    build_embs
 
 
 class ChangeModel(nn.Module):
@@ -30,9 +29,8 @@ class ChangeModel(nn.Module):
                                       use_ega=self.cfg.model.use_ega).to(self.device)
         else:
             raise NotImplementedError(f"Unsupported FPN type: {self.cfg.model.fpn_type}")
+
         self.lang_dim = 2048 if cfg.model.text_encoder_name == 'microsoft/phi-1_5' else 768
-        self.use_text_description = cfg.model.use_text_description
-        self.desc_embs = cfg.model.desc_embs  # 预训练文本嵌入路径
         self.mask_head = MaskHead(
             vis_dim=self.cfg.model.out_dims[-1] if not self.cfg.model.use_token_connector else self.cfg.model.out_dims[-1]//2,
             lang_dim=self.lang_dim,
@@ -40,17 +38,8 @@ class ChangeModel(nn.Module):
             n_heads=8
         ).to(self.device)
 
-        if self.use_text_description and self.desc_embs is None:
-            if cfg.model.text_encoder_name == "microsoft/phi-1_5":
-                self.llm = TextEncoderLLM(model_name=cfg.model.text_encoder_name, device=self.device,
-                                          freeze_text_encoder=cfg.model.freeze_text_encoder)
-            elif cfg.model.text_encoder_name == "bert-base-uncased":
-                self.llm = TextEncoderBert(model_name=cfg.model.text_encoder_name, device=self.device,
-                                           freeze_text_encoder=cfg.model.freeze_text_encoder)
-            else:
-                raise NotImplementedError(f"Unsupported text encoder name: {cfg.model.text_encoder_name}")
 
-    def forward(self, image1, image2, prompts=None):
+    def forward(self, image1:  torch.Tensor, image2: torch.Tensor, embs: torch.Tensor):
         image1 = image1.to(self.device)
         image2 = image2.to(self.device)
         B, _, H, W = image1.shape  # 获取原图尺寸
@@ -60,27 +49,8 @@ class ChangeModel(nn.Module):
         # 将原始图像尺寸传入 FPN Feature Fuser
         merged_feat = self.fpn(multi_scale_diff_feats)
 
-        description_embeddings = None
-        if self.use_text_description:
-            if self.desc_embs is not None:
-                # 加载预计算的描述嵌入调整批次
-                description_embeddings = torch.load(self.desc_embs).to(self.device).expand(B, -1,
-                                                                                           -1)  # 形状: [B, num_descriptions, lang_dim]
-            elif prompts is not None and prompts[0] != '':
-                # 实时通过 LLM 生成描述嵌入
-                description_embeddings, _ = self.llm(prompts)
-            else:
-                # 如果不使用文本描述，可以使用占位符或默认值
-                description_embeddings = torch.zeros((B, 4, self.lang_dim), device=self.device)
-        else:
-            # 如果不使用文本描述，可以使用占位符或默认值
-            description_embeddings = torch.zeros((B, 4, self.lang_dim), device=self.device)
-
-        # 确保 description_embeddings 不为 None
-        if description_embeddings is None:
-            description_embeddings = torch.zeros((B, 4, self.lang_dim), device=self.device)
-
-        mask = self.mask_head(merged_feat, description_embeddings)
+        # mask head
+        mask = self.mask_head(merged_feat, embs)
         return mask
 
     def to(self, device):
@@ -89,8 +59,6 @@ class ChangeModel(nn.Module):
         self.feature_diff = self.feature_diff.to(device)
         self.fpn = self.fpn.to(device)
         self.mask_head = self.mask_head.to(device)
-        if self.use_text_description and self.desc_embs is None:
-            self.llm = self.llm.to(device)
         return self
 
 
@@ -127,7 +95,8 @@ if __name__ == '__main__':
     # 输入张量也移动到相同设备
     image1 = torch.randn(2, 3, 512, 512).to(device)
     image2 = torch.randn(2, 3, 512, 512).to(device)
-    prompts = ["Detection of building changes",  "Detection of building changes"]
+    embs = build_embs(prompts=[''], text_encoder_name=cfg.model.text_encoder_name,
+                      freeze_text_encoder=cfg.model.freeze_text_encoder, device=device, batch_size=2)
 
     from thop import profile
     import time
@@ -154,21 +123,16 @@ if __name__ == '__main__':
 
         # Mask Head
         merged_feat = model.fpn(multi_scale_diff_feats)
-        if model.use_text_description and model.desc_embs is not None:
-            description_embeddings = torch.load(model.desc_embs).to(device).expand(2, -1, -1)
-        else:
-            description_embeddings = torch.zeros((2, 4, model.lang_dim), device=device)
         start_mask = time.time()
-        flops, params = profile(model.mask_head, inputs=(merged_feat, description_embeddings), verbose=False)
+        flops, params = profile(model.mask_head, inputs=(merged_feat, embs), verbose=False)
         print(f"Mask Head - FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {time.time() - start_mask:.2f}")
 
     start = time.time()
-    mask = model(image1, image2, prompts).to(device)
+    mask = model(image1, image2, embs).to(device)
     last = time.time()
     print(mask.shape)
-    print(mask)
 
     # 总FLOPs
-    total_flops, total_params = profile(model, inputs=(image1, image2, prompts), verbose=False)
-    print(f"encoder FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {(last - start):.2f} s")
+    total_flops, total_params = profile(model, inputs=(image1, image2, embs), verbose=False)
+    print(f"Total FLOPs: {total_flops / 1e9:.2f} G, Params: {total_params / 1e6:.2f} M, time: {(last - start):.2f} s")
 

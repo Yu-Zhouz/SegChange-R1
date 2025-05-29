@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project version="4">
-  <component name="Black">
-    <option name="sdkName" value="Remote Python 3.12.9 (sftp://root@172.16.15.10:30043/opt/conda/envs/segchange/bin/python3.12)" />
-  </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Remote Python 3.12.9 (sftp://root@172.16.15.10:30043/opt/conda/envs/segchange/bin/python3.12)" project-jdk-type="Python SDK" />
-</project>

@@ -11,6 +11,7 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+from typing import List
 
 
 class SE(nn.Module):
@@ -27,8 +28,8 @@ class SE(nn.Module):
     def forward(self, x):
         b, c, h, w = x.size()
         weight = self.avg_pool(x)  # Squeeze
-        weight = self.fc(weight)   # Excitation -> (B, C, 1, 1)
-        return x * weight          # Reweight
+        weight = self.fc(weight)  # Excitation -> (B, C, 1, 1)
+        return x * weight  # Reweight
 
 
 class CBAM(nn.Module):
@@ -83,11 +84,7 @@ class FeatureDiffModule(nn.Module):
         else:
             raise ValueError('diff_attention must be CBAM or SE')
 
-        if self.use_fusion:
-            # 使用可学习的上采样 + 融合
-            self.fusion_proj = nn.Conv2d(sum(in_channels_list), in_channels_list[-1], kernel_size=1)
-
-    def forward(self, feats1, feats2):
+    def forward(self, feats1: List[torch.Tensor], feats2: List[torch.Tensor]) -> List[torch.Tensor]:
         diff_feats = []
         for i in range(len(feats1)):
             f1, f2 = feats1[i], feats2[i]
@@ -97,14 +94,6 @@ class FeatureDiffModule(nn.Module):
             diff = self.diff_conv[i](concat)
             diff = self.attention[i](diff)
             diff_feats.append(diff)
-
-        if self.use_fusion:
-            # 上采样到最大尺寸后再融合
-            target_size = feats1[0].shape[2:]
-            upsampled = [F.interpolate(f, size=target_size, mode='bilinear', align_corners=True) for f in diff_feats]
-            fused = torch.cat(upsampled, dim=1)
-            fused = self.fusion_proj(fused)
-            diff_feats.append(fused)
 
         return diff_feats
 
@@ -121,6 +110,7 @@ if __name__ == '__main__':
               torch.randn(2, 256, 32, 32).to('cuda'),
               torch.randn(2, 256, 16, 16).to('cuda')]
     import time
+
     start = time.time()
     diff_feats = model(feats1, feats2)
     last = time.time()
@@ -128,5 +118,6 @@ if __name__ == '__main__':
         print(diff_feats[i].shape)
 
     from thop import profile
+
     flops, params = profile(model, inputs=(feats1, feats2))
     print(f"encoder FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {(last - start):.2f} s")

@@ -1,10 +1,10 @@
+from .transforms import *
+from .loading_data import *
+from .building import *
 import torch
-from dataloader.loading_data import loading_data
 from utils import collate_fn_building
 from torch.utils.data import DataLoader
 import logging
-from .building import Building
-
 
 def build_dataset(cfg):
     train_set, val_set = loading_data(cfg)
@@ -20,7 +20,7 @@ def build_dataset(cfg):
                                  collate_fn=collate_fn_building, num_workers=cfg.num_workers)
     # Log dataset scanning results
     logging.info("------------------------ preprocess dataset ------------------------")
-    logging.info("Data_path: %s", cfg.data_root)
-    logging.info("Data offset:\n %s", cfg.data)
+    logging.info("Data_path: %s", cfg.data.data_root)
+    logging.info("Data Transforms:\n %s", cfg.data.transforms)
     logging.info(f"# Train {train_set.nSamples}, Val {val_set.nSamples}")
     return data_loader_train, data_loader_val

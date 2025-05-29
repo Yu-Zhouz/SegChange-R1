@@ -15,11 +15,13 @@ import gradio as gr
 import cv2
 import torch
 
+
 # 获取项目根目录
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
 sys.path.append(project_root)
 
-from engines import load_model, preprocess_image, postprocess_mask
+from engines import load_model, preprocess_image
+from models import PostProcessor
 from utils import load_config
 
 
@@ -41,7 +43,7 @@ os.environ["ORIGINS"] = "*"
 # 加载参数和模型
 cfg = load_config('/sxs/zhoufei/SegChange-R1/configs/config.yaml')
 cfg.infer.weights_dir = '/sxs/zhoufei/SegChange-R1/work_dirs/train_0/checkpoints/best_iou.pth'
-model = load_model(cfg)
+model = load_model(cfg, cfg.infer.weights_dir, cfg.infer.device)
 
 
 def process_images(img_a, img_b, prompt, threshold=0.5):
@@ -55,7 +57,7 @@ def process_images(img_a, img_b, prompt, threshold=0.5):
     Returns:
         img_a_marked: 标记变化区域的第一张图像
         img_b_marked: 标记变化区域的第二张图像
-        mask: 生成的变化掩码
+        masks: 生成的变化掩码
     """
     # 预处理图像
     img_a_tensor, img_b_tensor = preprocess_image(img_a, img_b, cfg.device)
@@ -68,7 +70,8 @@ def process_images(img_a, img_b, prompt, threshold=0.5):
     # 提取掩码
     mask = (preds[0] * 255).astype('uint8')
     # 后处理掩码
-    mask = postprocess_mask(mask)
+    postprocess = PostProcessor(min_area=1000, max_p_a_ratio=10, min_convexity=0.8)
+    mask, _ = postprocess.postprocess_mask(mask)
 
     # 在图像上绘制变化区域
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)

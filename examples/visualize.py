@@ -66,7 +66,7 @@ def register_hooks(model, layer_names):
 
 def visualize_fm(feature_map, save_path=None, n_cols=8):
     """
-    可视化 feature map
+    可视化 neck map
     Args:
         feature_map: Tensor [C, H, W]
         save_path: str or None，保存路径
@@ -176,7 +176,7 @@ def main():
         logits = model(img_a.unsqueeze(0), img_b.unsqueeze(0), desc_text)  # 增加批次维度
         print("Model output (logits):", logits)
 
-    # 对每个层可视化 feature map 并保存
+    # 对每个层可视化 neck map 并保存
     for layer_name in layers_to_visualize:
         if layer_name not in activations:
             print(f"No activation found for layer: {layer_name}")

@@ -30,12 +30,6 @@ def get_args_config():
 
 
 def setup_logging(cfg, log_dirs):
-    """
-    配置日志模块。
-    :param config: 配置信息，包含日志级别和日志文件路径。
-    :param api: 是否为 API 日志。如果为 True，则日志文件名会包含 "api"。
-    """
-
     # 日期命名
     current_date = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     os.makedirs(log_dirs, exist_ok=True)

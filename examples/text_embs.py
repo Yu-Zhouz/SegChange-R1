@@ -11,12 +11,11 @@
 import argparse
 import os
 import sys
-import torch
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
-from models import TextEncoderLLM, TextEncoderBert
+from models import build_embs
 from utils import load_config
 
 
@@ -31,25 +30,13 @@ def get_args_config():
     return cfg
 
 
-def emb_model():
-    cfg = get_args_config()
-    prompts = cfg.additional_text if hasattr(cfg, 'additional_text') else 'Buildings with changes'
-    if cfg.model.text_encoder_name == "microsoft/phi-1_5":
-        model = TextEncoderLLM(model_name=cfg.model.text_encoder_name, device=cfg.device,
-                               freeze_text_encoder=cfg.model.freeze_text_encoder)
-    elif cfg.model.text_encoder_name == "bert-base-uncased":
-        model = TextEncoderBert(model_name=cfg.model.text_encoder_name, device=cfg.device,
-                                freeze_text_encoder=cfg.model.freeze_text_encoder)
-    else:
-        raise NotImplementedError(f"Unsupported text encoder name: {cfg.model.text_encoder_name}")
-    desc_embs, _ = model(prompts)
-    print(desc_embs.shape)
-    os.makedirs(os.path.dirname(cfg.model.desc_embs), exist_ok=True)
-    torch.save(desc_embs, cfg.model.desc_embs)
-
-    print("Description embeddings saved successfully!")
-
-
 
 if __name__ == '__main__':
-    emb_model()
+    cfg = get_args_config()
+    desc_embs = build_embs(
+        prompts=cfg.prompt,
+        text_encoder_name=cfg.model.text_encoder_name,
+        freeze_text_encoder=cfg.model.freeze_text_encoder,
+        device=cfg.device,
+        batch_size=cfg.training.batch_size)
+    print(f'✅ desc_embs shape:{desc_embs.shape}')

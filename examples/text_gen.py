@@ -33,12 +33,12 @@ def get_args_config():
     return cfg
 
 
-def export_filenames_to_txt(directory, output_file, additional_text):
+def export_filenames_to_txt(directory, output_file, prompt):
     """
     导出指定目录下的所有图像文件名到指定的 .txt 文件中，每个文件名占一行，并在文件名后添加指定的文本内容。
     :param directory: 包含图像文件的目录路径
     :param output_file: 输出的 .txt 文件路径
-    :param additional_text: 要添加到每个文件名后面的文本内容
+    :param prompt: 要添加到每个文件名后面的文本内容
     """
     # 获取目录下所有文件
     files = os.listdir(directory)
@@ -49,7 +49,7 @@ def export_filenames_to_txt(directory, output_file, additional_text):
     # 将文件名和附加文本写入 .txt 文件
     with open(output_file, 'w') as f:
         for image_file in image_files:
-            f.write(image_file + '  ' + additional_text + '\n')
+            f.write(image_file + '  ' + prompt + '\n')
 
     print(f"已导出 {len(image_files)} 个图像文件名到 {output_file}，并添加了附加文本。")
 
@@ -59,7 +59,7 @@ def generate_prompts_txt(cfg):
     根据配置文件生成 prompts.txt 文件
     """
     data_format = cfg.data_format
-    additional_text = cfg.additional_text if hasattr(cfg, 'additional_text') else 'Buildings with changes'
+    prompt = cfg.prompt if hasattr(cfg, 'prompt') else 'Buildings with changes'
 
     if data_format == 'default':
         # 默认数据集结构
@@ -70,7 +70,7 @@ def generate_prompts_txt(cfg):
             # 构建输出文件路径
             output_txt_path = os.path.join(cfg.data_root, subset, 'prompts.txt')
             # 导出文件名到 prompts.txt
-            export_filenames_to_txt(a_dir, output_txt_path, additional_text)
+            export_filenames_to_txt(a_dir, output_txt_path, prompt)
     elif data_format == 'custom':
         # 自定义数据集结构
         # 构建输入目录路径
@@ -78,7 +78,7 @@ def generate_prompts_txt(cfg):
         # 构建输出文件路径
         output_txt_path = os.path.join(cfg.data_root, 'prompts.txt')
         # 导出文件名到 prompts.txt
-        export_filenames_to_txt(a_dir, output_txt_path, additional_text)
+        export_filenames_to_txt(a_dir, output_txt_path, prompt)
 
     else:
         raise ValueError(f"Unsupported data format: {data_format}")
