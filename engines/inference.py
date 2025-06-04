@@ -26,14 +26,17 @@ def read_image_in_chunks(image_path, chunk_size=25600):
     with rasterio.open(image_path) as src:
         width = src.width
         height = src.height
-        meta = src.meta
-
         chunks = []
         for y in range(0, height, chunk_size):
             for x in range(0, width, chunk_size):
                 window = rasterio.windows.Window(x, y, chunk_size, chunk_size)
                 chunk = src.read(window=window)
                 chunk = np.transpose(chunk, (1, 2, 0))  # HWC 格式
+                if chunk.shape[2] == 4:
+                    chunk = chunk[:, :, :3]  # 丢弃 alpha 通道
+                # 如果是 uint16，转换为 uint8
+                if chunk.dtype == np.uint16:
+                    chunk = (chunk / 65535.0 * 255).astype(np.uint8)
                 chunks.append((x, y, chunk))
 
         return chunks, (height, width)
