@@ -15,11 +15,7 @@ import sys
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
-from utils import load_config
-
-
-# 支持的图像格式
-SUPPORTED_IMAGE_FORMATS = ['.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp']
+from utils import load_config, SUPPORTED_IMAGE_FORMATS
 
 
 def get_args_config():

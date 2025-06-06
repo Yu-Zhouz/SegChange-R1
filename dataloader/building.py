@@ -18,8 +18,7 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 from dataloader import build_transforms
-
-SUPPORTED_IMAGE_FORMATS = ['.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.tif', '.webp']
+from utils import SUPPORTED_IMAGE_FORMATS
 
 
 class Building(Dataset):

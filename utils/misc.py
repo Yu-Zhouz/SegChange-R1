@@ -24,6 +24,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+
+SUPPORTED_IMAGE_FORMATS = ['.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.tif', '.webp']
+
+
 # needed due to empty tensor bug in pytorch and torchvision 0.5
 
 '''
