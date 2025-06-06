@@ -64,6 +64,10 @@ def generate_prompts_txt(cfg):
         for subset in subsets:
             # 构建目录路径
             a_dir = os.path.join(data_root, subset, 'A')
+            # 检查文件夹是否存在
+            if not os.path.exists(a_dir):
+                print(f"目录 {a_dir} 不存在，跳过该子集。")
+                continue
             # 构建输出文件路径
             output_txt_path = os.path.join(data_root, subset, 'prompts.txt')
             # 导出文件名到 prompts.txt
@@ -71,9 +75,9 @@ def generate_prompts_txt(cfg):
     elif data_format == 'custom':
         # 自定义数据集结构
         # 构建输入目录路径
-        a_dir = os.path.join(cfg.data_root, 'A')
+        a_dir = os.path.join(data_root, 'A')
         # 构建输出文件路径
-        output_txt_path = os.path.join(cfg.data_root, 'prompts.txt')
+        output_txt_path = os.path.join(data_root, 'prompts.txt')
         # 导出文件名到 prompts.txt
         export_filenames_to_txt(a_dir, output_txt_path, prompt)
 

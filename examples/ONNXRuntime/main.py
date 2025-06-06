@@ -329,7 +329,7 @@ def postprocess_mask(mask, area_threshold=2500, perimeter_area_ratio_threshold=1
     return result_mask, (min_area, max_ratio, min_convexity)
 
 
-def slide_window_inference_onnx(session, img_a, img_b, embs, output_dir, crop_size=512, overlap=0, threshold=0.5,
+def slide_window_inference_onnx(session, img_a, img_b, embs, output_dir, threshold=0.5, crop_size=512, overlap=0,
                                 global_coord_offset=None):
     height, width, _ = img_a.shape
     result_mask = np.zeros((height, width), dtype=np.uint8)
@@ -360,7 +360,7 @@ def slide_window_inference_onnx(session, img_a, img_b, embs, output_dir, crop_si
             preds = (outputs[0] > threshold).astype('uint8') * 255
             mask = preds[0, 0]
 
-            mask, _ = postprocess_mask(mask)
+            # mask, _ = postprocess_mask(mask)
 
             mask_dir = os.path.join(output_dir, 'masks')
             os.makedirs(mask_dir, exist_ok=True)
@@ -392,7 +392,8 @@ def slide_window_inference_onnx(session, img_a, img_b, embs, output_dir, crop_si
 
 
 def predict_onnx(args):
-    output_dir = get_output_dir(args.output_dir, 'infer_results')
+    name = os.path.basename(os.path.normpath(args.input_dir))
+    output_dir = get_output_dir(args.output_dir, name)
     logger = setup_logging(log_dirs=output_dir)
     logger.info('Inference Log %s' % time.strftime("%c"))
     logger.info(f'Input on %s {args.input_dir}，Output on {output_dir}')
