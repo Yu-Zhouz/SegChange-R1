@@ -1,8 +1,8 @@
-# SegChange-R1
+# SegChange-R1: Augmented Reasoning for Remote Sensing Change Detection via Large Language Models
 
 ## 项目介绍
 
-SegChange-R1 是一个基于深度学习的变化检测模型项目，主要用于分析和识别图像中的变化区域（如建筑物变化等）。该项目结合了视觉编码器与文本描述信息，通过 双时相视觉编码器 提取双时态图像的多尺度特征，利用特征差异模块进行特征差异建模，并引入多尺度特征融合模块融合多尺度特征。此外，它支持集成文本描述信息以增强检测能力，使用掩码预测头生成最终的变化掩码。项目还提供了完整的训练、测试流程及损失函数配置，适用于遥感图像、城市规划、环境监测等领域中的变化检测任务。
+SegChange-R1 是一个基于深度学习的变化检测模型项目，主要用于分析和识别图像中的变化区域（如建筑物变化等）。该项目结合了视觉编码器与文本描述信息，通过双时相视觉编码器提取双时态图像的多尺度特征，利用特征差异模块进行特征差异建模，并引入多尺度特征融合模块融合多尺度特征。此外，它支持集成文本描述信息以增强检测能力，使用掩码预测头生成最终的变化掩码。项目还提供了完整的训练、测试流程及损失函数配置，适用于遥感图像、城市规划、环境监测等领域中的变化检测任务。
 
 ## 系统要求
 
@@ -65,25 +65,23 @@ data/
 数据集的结构如下：
 ```text
 data/
-  ├── A/                  # 第一时相训练图像
-  │── B/                  # 第二时相训练图像
-  │── label/              # 训练标签（变化掩码）
-  │── list                # 列表文件
-  │   ├── train.txt       # 训练集列表
-  │   ├── val.txt         # 训练集列表
-  │   └── test.txt        # 验证集列表
-  └── prompts.txt         # 训练集文本描述提示
+  ├── A/                      # 第一时相训练图像
+  │── B/                      # 第二时相训练图像
+  │── label/                  # 训练标签（变化掩码）
+  │── list                    # 列表文件
+  │   ├── train.txt           # 训练集列表
+  │   ├── val.txt             # 训练集列表
+  │   └── test.txt            # 验证集列表
+  └── prompts.txt             # 训练集文本描述提示
 ```
 修改参数文件[configs](./configs/config.yaml)中的`data_format`为`custom`。
 
 ## 训练
 
 ### 生成词嵌入文件
-可先生成固定的描述文本词嵌入文件，并保存在`weights/embeddings.pt`文件中，将嵌入文件地址填入 参数文件[configs](./configs/config.yaml)中`desc_embs`，这样的好处是，训练速度会更快，训练结果更准确。
-```bash
-python ./examples/text_embs.py -c ./configs/config.yaml
-```
-也可以使用[文本生成](./examples/text_gen.py), 并修改参数文件[configs](./configs/config.yaml)中的`desc_embs`为`None`，执行脚本。
+
+使用[文本生成](./examples/text_gen.py), 并修改参数文件[configs](./configs/config.yaml)中的`desc_embs`为`None`，执行脚本。
+
 ```bash
 python ./examples/text_gen.py -c ./configs/config.yaml
 ```
@@ -101,7 +99,7 @@ python test.py -c ./configs/config.yaml
 
 ## 推理TIF
 ```bash
-python inference.py -c ./configs/config.yaml
+python infer.py -c ./configs/config.yaml
 ```
 
 ## app demo
@@ -118,7 +116,6 @@ bash run.sh
 ## 许可证
 
 本项目使用 [MIT许可证](LICENSE)
-
 
 ## 参考
 https://blog.csdn.net/weixin_45679938/article/details/142030784

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 @Project : SegChange-R1
-@FileName: encoder.py
+@FileName: encoders.py
 @Time    : 2025/4/18 上午9:50
 @Author  : ZhouFei
 @Email   : zhoufei.net@gmail.com
@@ -9,7 +9,10 @@
 @Usage   :
 """
 import torch.nn as nn
-from models import VisualEncoder, BEVTransformer, BEVLinearAttention, ResNet50Encoder, HGNetv2
+
+from .backbone import ResNet50Encoder, VisualEncoder
+from .hgnetv2 import HGNetv2
+from .bev import BEVTransformer, BEVLinearAttention
 
 
 class DualInputVisualEncoder(nn.Module):
@@ -23,8 +26,8 @@ class DualInputVisualEncoder(nn.Module):
             # 添加1×1卷积层用于统一通道
             self.conv_list = nn.ModuleList([nn.Conv2d(in_dim, out_dim, kernel_size=1) for in_dim, out_dim in zip([128, 256, 512, 1024], cfg.model.out_dims)])
         elif cfg.model.backbone_name == 'hgnetv2':
-            self.encoder = HGNetv2(name="B0", use_lab=True, return_idx=[0, 1, 2, 3])
-            self.conv_list = nn.ModuleList([nn.Conv2d(in_dim, out_dim, kernel_size=1) for in_dim, out_dim in zip([64, 256, 512, 1024], cfg.model.out_dims)])
+            self.encoder = HGNetv2(name="B5", use_lab=False, return_idx=[0, 1, 2, 3])
+            self.conv_list = nn.ModuleList([nn.Conv2d(in_dim, out_dim, kernel_size=1) for in_dim, out_dim in zip([128, 512, 1024, 2048], cfg.model.out_dims)])
 
         if cfg.model.bev_name == 'Transformer':
             self.bev = nn.ModuleList([
@@ -54,13 +57,12 @@ class DualInputVisualEncoder(nn.Module):
             multi_scale_bev_feats2.append(feat2_bev)
         return multi_scale_bev_feats1, multi_scale_bev_feats2
 
-
 # 测试
 if __name__ == '__main__':
     import torch
     from utils import load_config
-    cfg = load_config('../configs/config.yaml')
-    cfg.model.backbone_name = 'resnet50'
+    cfg = load_config('../../configs/config.yaml')
+    cfg.model.backbone_name = 'hgnetv2'
     model = DualInputVisualEncoder(cfg).to('cuda')
     image1 = torch.randn(2, 3, 512, 512).to('cuda')
     image2 = torch.randn(2, 3, 512, 512).to('cuda')
@@ -73,4 +75,4 @@ if __name__ == '__main__':
 
     from thop import profile
     flops, params = profile(model, inputs=(image1, image2))
-    print(f"encoder FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {(last - start):.2f} s")
+    print(f"encoders FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M, time: {(last - start):.2f} s")

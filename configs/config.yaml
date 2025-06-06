@@ -1,46 +1,48 @@
 name: 'train'
-device: 'cuda:2'
+device: 'cuda:1'
 seed: 42
 output_dir: ./work_dirs
-num_workers: 8
+num_workers: 12
 resume: null  # 如果存在，则恢复训练
-data_root: ./data/change
-data_format: 'custom'  # [default, custom]
-additional_text: 'Buildings with changes, Arable land changes, Changes in industrial land use, woodland changes.'
+prompt: 'Buildings with changes, Mound changes.'
+onnx_weights: './examples/ONNXRuntime/weights'
 
 data:
-  transform: true
-  color_jitter: 0  # 颜色抖动
-  rotation_degree: 0  # 旋转角度
-  gamma_range: [1.0, 1.0]  # 亮度
-  affine_degree: 0   # 仿射变换
-  erase_prob: 0  # 随机擦除
-  erase_ratio: [0, 0]  # 随机擦除大小
-  blur_sigma: 0.3  # 高斯模糊
+  data_root: './data/change'
+  data_format: 'custom'                           # [default, custom]
+  transforms:
+    apply_prob: 0.5                               # 应用概率
+    color_jitter: 0.2                             # 颜色抖动
+    rotation_degree: 15                           # 旋转角度
+    gamma_range: [0.8, 1.2]                       # Gamma矫正
+    affine_degree: 0                              # 仿射变换
+    erase_prob: 0                                 # 随机擦除
+    erase_ratio: [0, 0]                           # 随机擦除大小
+    blur_sigma: 0.3                               # 高斯模糊
+    clahe: 0.5                                    # 直方图均衡化
 
 model:
   num_classes: 1
-  backbone_name: "swin_base_patch4_window7_224"  # ['swin_base_patch4_window7_224', 'resnet50', 'hgnetv2']
-  bev_name: "LinearAttention"  # [LinearAttention, Transformer]
-  fpn_type: "L-FPN" # ['FPN', 'L-FPN']
-  use_ega: true  # 是否使用 边缘-高斯聚合（EGA）模块
-  diff_attention: "CBAM"  # ['SE', 'CBAM']
+  backbone_name: "swin_base_patch4_window7_224"   # ['swin_base_patch4_window7_224', 'resnet50', 'hgnetv2']
+  bev_name: "LinearAttention"                     # [LinearAttention, Transformer]
+  fpn_type: "L-FPN"                               # ['FPN', 'L-FPN']
+  use_ega: true                                   # 是否使用 边缘-高斯聚合（EGA）模块
+  diff_attention: "CBAM"                          # ['SE', 'CBAM']
   out_dims: [256, 256, 256, 256]
-  use_token_connector: False  # 是否降低 token 维度
-  pretrained: True  # 是否使用预训练的模型参数
+  use_token_connector: False                      # 是否降低 token 维度
+  pretrained: True                                # 是否使用预训练的模型参数
   img_size: 512
-  use_text_description: True  # 是否使用文本描述
-  text_encoder_name: "bert-base-uncased"  # [microsoft/phi-1_5, bert-base-uncased]
-  desc_embs: null   # 文本描述向量地址 "./weights/embeddings.pt"
-  freeze_text_encoder: True # 冻结模型参数
+  text_encoder_name: "bert-base-uncased"          # [microsoft/phi-1_5, bert-base-uncased]
+  desc_embs: null                                 # 文本描述向量地址 "./weights/embeddings.pt"
+  freeze_text_encoder: True                       # 冻结模型参数
 
 loss:
-  weight_ce: 1.0  # 分类任务基础损失
-  weight_dice: 1.5  # 提升边界分割精度
-  weight_focal: 1.5  # 缓解类别不平衡
-  alpha: 0.6  # 平衡正负样本的比例
-  gamma: 2.0  # 聚焦参数，控制简单样本的下降速率
-  weight_bcl: 0.3  # 增强特征区分度
+  weight_ce: 1.0                                  # 分类任务基础损失
+  weight_dice: 1.5                                # 提升边界分割精度
+  weight_focal: 1.5                               # 缓解类别不平衡
+  alpha: 0.6                                      # 平衡正负样本的比例
+  gamma: 2.0                                      # 聚焦参数，控制简单样本的下降速率
+  weight_bcl: 0.3                                 # 增强特征区分度
 
 logger:
   log_name: 'Seg_log'
@@ -60,20 +62,20 @@ training:
   threshold: 0.5
 
 test:
-  img_dirs: './data'
+  img_dirs: './data/change'
   batch_size: 1
   threshold: 0.5
   device: 'cuda:1'
   save_dir: "./work_dirs"
   name: "test"
-  weight_path: "./work_dirs/train_3/checkpoints/best_iou.pth"
+  weights_dir: './work_dirs/train_0/checkpoints/best_iou.pth'
   show: True
   show_overlay: False
 
 infer:
-  name: 'infer_BL2_100'
-  input_dir:  './data/BL2_100'
-  chunk_size: 25600
+  name: 'BL2_5'
+  input_dir: '/data/BL2_5'
+  chunk_size: 25600  # 25600
   weights_dir: './work_dirs/train_0/checkpoints/best_iou.pth'
   output_dir: './outputs'
   threshold: 0.5

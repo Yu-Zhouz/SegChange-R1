@@ -13,7 +13,6 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from dataloader import Building
 from engines import evaluate_model, load_model
-from models import build_model
 import pprint
 import time
 from utils import get_args_config, get_output_dir, setup_logging
@@ -28,7 +27,7 @@ def main():
     logger.info(pprint.pformat(cfg.__dict__))
     device = cfg.test.device
 
-    model = load_model(cfg)
+    model = load_model(cfg, cfg.test.weights_dir, cfg.test.device)
 
     # Build test dataset
     transform = transforms.Compose([
