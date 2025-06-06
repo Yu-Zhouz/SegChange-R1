@@ -17,8 +17,9 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
-
 from dataloader import build_transforms
+
+SUPPORTED_IMAGE_FORMATS = ['.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.tif', '.webp']
 
 
 class Building(Dataset):
@@ -53,7 +54,10 @@ class Building(Dataset):
 
         # 根据数据集格式加载图像路径
         if self.data_format == "default":
-            a_img_paths = [filename for filename in os.listdir(self.a_dir) if filename.endswith('.png')]
+            a_img_paths = [
+                filename for filename in os.listdir(self.a_dir)
+                if os.path.splitext(filename)[1].lower() in SUPPORTED_IMAGE_FORMATS
+            ]
             for filename in a_img_paths:
                 a_img_path = os.path.join(self.a_dir, filename)
                 b_img_path = os.path.join(self.b_dir, filename)

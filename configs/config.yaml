@@ -75,7 +75,7 @@ test:
 infer:
   name: 'BL2_5'
   input_dir: '/data/BL2_5'
-  chunk_size: 0  # 25600
+  chunk_size: 25600  # 25600
   weights_dir: './work_dirs/train_0/checkpoints/best_iou.pth'
   output_dir: './outputs'
   threshold: 0.5
