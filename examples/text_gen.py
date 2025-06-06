@@ -58,7 +58,8 @@ def generate_prompts_txt(cfg):
     """
     根据配置文件生成 prompts.txt 文件
     """
-    data_format = cfg.data_format
+    data_root = cfg.data.data_root
+    data_format = cfg.data.data_format
     prompt = cfg.prompt if hasattr(cfg, 'prompt') else 'Buildings with changes'
 
     if data_format == 'default':
@@ -66,9 +67,9 @@ def generate_prompts_txt(cfg):
         subsets = ['train', 'val', 'test']
         for subset in subsets:
             # 构建目录路径
-            a_dir = os.path.join(cfg.data_root, subset, 'A')
+            a_dir = os.path.join(data_root, subset, 'A')
             # 构建输出文件路径
-            output_txt_path = os.path.join(cfg.data_root, subset, 'prompts.txt')
+            output_txt_path = os.path.join(data_root, subset, 'prompts.txt')
             # 导出文件名到 prompts.txt
             export_filenames_to_txt(a_dir, output_txt_path, prompt)
     elif data_format == 'custom':
