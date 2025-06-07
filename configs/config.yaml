@@ -1,5 +1,5 @@
 name: 'train'
-device: 'cuda:1'
+device: 'cuda:0'
 seed: 42
 output_dir: ./work_dirs
 num_workers: 12
@@ -65,10 +65,11 @@ test:
   img_dirs: './data/change'
   batch_size: 1
   threshold: 0.5
+  postprocess: False  # 控制是否应用后处理
   device: 'cuda:1'
-  save_dir: "./work_dirs"
   name: "test"
   weights_dir: './work_dirs/train_0/checkpoints/best_iou.pth'
+  save_dir: "./work_dirs"
   show: True
   show_overlay: False
 
@@ -76,6 +77,7 @@ infer:
   name: 'BL2_5'
   input_dir: '/data/BL2_5'
   chunk_size: 25600  # 25600
+  postprocess: False  # 控制是否应用后处理
   weights_dir: './work_dirs/train_0/checkpoints/best_iou.pth'
   output_dir: './outputs'
   threshold: 0.5

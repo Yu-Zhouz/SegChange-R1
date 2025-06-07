@@ -252,24 +252,6 @@ def preprocess_image(img_a, img_b):
     return img_a, img_b
 
 
-# def postprocess_mask(mask):
-#     # TODO: 后处理
-#     result_mask = np.zeros_like(mask)
-#     num_labels, labels = cv2.connectedComponents(mask)
-#     for label in range(1, num_labels):
-#         coords = np.column_stack(np.where(labels == label))
-#         y_coords = coords[:, 0]
-#         x_coords = coords[:, 1]
-#         height = np.max(y_coords) - np.min(y_coords) + 1
-#         width = np.max(x_coords) - np.min(x_coords) + 1
-#         if height >= 50 or width >= 50:
-#             result_mask[labels == label] = 255
-#     contours, _ = cv2.findContours(result_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-#     filled_mask = np.zeros_like(result_mask)
-#     for contour in contours:
-#         cv2.drawContours(filled_mask, [contour], -1, 255, thickness=cv2.FILLED)
-#     return filled_mask
-
 def postprocess_mask(mask, area_threshold=2500, perimeter_area_ratio_threshold=10, convexity_threshold=0.8):
     # 连通域分析
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -360,6 +342,7 @@ def slide_window_inference_onnx(session, img_a, img_b, embs, output_dir, thresho
             preds = (outputs[0] > threshold).astype('uint8') * 255
             mask = preds[0, 0]
 
+            # TODO: 后处理 PostProcessor
             # mask, _ = postprocess_mask(mask)
 
             mask_dir = os.path.join(output_dir, 'masks')

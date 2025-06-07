@@ -129,8 +129,8 @@ def build_embs(
         freeze_text_encoder: bool,
         device: str,
         desc_embs_dir: str = None,
-        seq_len: Optional[int] = None,
         batch_size: int = 1,
+        seq_len: Optional[int] = 8,
     ) -> torch.Tensor:
     """
     生成文本描述的嵌入向量，并根据指定长度进行填充或截断。

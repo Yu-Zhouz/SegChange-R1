@@ -172,54 +172,8 @@ def preprocess_image(img_a, img_b, device):
 
     return img_a, img_b
 
-
-# def postprocess_mask(mask):
-#     """
-#     mask后处理函数
-#         1. 实现像素面积过滤，分割区域像素面积小于1000像素则舍弃
-#         2. 区域连通处理，确保分割区域连通
-#     Args:
-#         mask: 推理得到的分割掩码
-#     Returns:
-#         masks: 处理后的分割掩码
-#     """
-#     # 创建一个空数组，用于存储处理后的结果
-#     result_mask = np.zeros_like(mask)
-#
-#     # 使用OpenCV的connectedComponents函数找到mask中的连通区域
-#     num_labels, labels = cv2.connectedComponents(mask)
-#
-#     # 遍历每个连通区域
-#     for label in range(1, num_labels):
-#         # 获取当前区域的坐标
-#         coords = np.column_stack(np.where(labels == label))
-#
-#         # 计算区域的高度和宽度
-#         y_coords = coords[:, 0]
-#         x_coords = coords[:, 1]
-#
-#         height = np.max(y_coords) - np.min(y_coords) + 1
-#         width = np.max(x_coords) - np.min(x_coords) + 1
-#
-#         # 如果区域的高度大于等于50或者宽度大于等于50，则保留该区域
-#         if height >= 50 or width >= 50:
-#             result_mask[labels == label] = 255
-#
-#     # 对结果进行连通区域处理，确保分割区域连通
-#     # 检测边缘
-#     contours, _ = cv2.findContours(result_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-#     # 创建一个与输入掩码大小相同的空白掩码
-#     filled_mask = np.zeros_like(result_mask)
-#     # 填充边缘
-#     for contour in contours:
-#         # 填充轮廓内的区域
-#         cv2.drawContours(filled_mask, [contour], -1, 255, thickness=cv2.FILLED)
-#
-#     return filled_mask
-
-
 def slide_window_inference(model, postprocessor, img_a, img_b, embs, device, output_dir, threshold=0.5, crop_size=512, overlap=0,
-                           global_coord_offset=None):
+                           global_coord_offset=None, postprocess=False):
     """
     滑动窗口推理函数
     Args:
@@ -232,6 +186,7 @@ def slide_window_inference(model, postprocessor, img_a, img_b, embs, device, out
         crop_size: 裁剪窗口大小
         overlap: 裁剪窗口的重叠区域
         global_coord_offset: 全局坐标偏移量，用于分块推理时的命名
+        postprocess: 是否进行后处理
     Returns:
         masks: 推理得到的分割掩码
     """
@@ -279,7 +234,8 @@ def slide_window_inference(model, postprocessor, img_a, img_b, embs, device, out
             mask = (preds[0] * 255).astype('uint8')
 
             # mask后处理
-            mask, metrics = postprocessor(mask)
+            if postprocess:
+                mask, _ = postprocessor(mask)
 
             # 将结果保存到指定目录
             mask_dir = os.path.join(output_dir, 'masks')
@@ -395,7 +351,7 @@ def predict(cfg):
             # 推理
             with torch.no_grad():
                 mask = slide_window_inference(model, postprocessor, img_a_patch, img_b_patch, embs, device, output_dir, threshold,
-                                              global_coord_offset=(x_a, y_a))
+                                              global_coord_offset=(x_a, y_a), postprocess=cfg.infer.postprocess)
 
             # 合并到最终掩码
             result_mask[y_a:y_a + mask.shape[0], x_a:x_a + mask.shape[1]] += mask
@@ -421,7 +377,7 @@ def predict(cfg):
 
         # 推理
         logger.info("Starting full-image inference...")
-        result_mask = slide_window_inference(model, postprocessor, img_a, img_b, embs, device, output_dir, threshold)
+        result_mask = slide_window_inference(model, postprocessor, img_a, img_b, embs, device, output_dir, threshold, postprocess=cfg.infer.postprocess)
 
     # 保存最终掩码为 tif 格式
     output_path = os.path.join(output_dir, "result_mask.tif")

@@ -8,14 +8,14 @@
 @Desc    : 测试建筑物变化检测模型
 @Usage   :
 """
-import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from dataloader import Building
 from engines import evaluate_model, load_model
 import pprint
 import time
-from utils import get_args_config, get_output_dir, setup_logging
+from models import PostProcessor
+from utils import get_args_config, get_output_dir, setup_logging, collate_fn_building
 
 
 def main():
@@ -29,6 +29,9 @@ def main():
 
     model = load_model(cfg, cfg.test.weights_dir, cfg.test.device)
 
+    # 创建后处理实例
+    postprocessor = PostProcessor(min_area=2500, max_p_a_ratio=10, min_convexity=0.8)
+
     # Build test dataset
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -40,14 +43,14 @@ def main():
         a_transform=transform,
         b_transform=transform,
         test=True,
-        data_format=cfg.data_format,
+        data_format=cfg.data.data_format,
     )
 
-    test_loader = DataLoader(test_dataset, batch_size=cfg.test.batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=cfg.test.batch_size, shuffle=False, collate_fn=collate_fn_building,)
 
     # Run evaluation
     logger.info("Start testing...")
-    metrics = evaluate_model(cfg, model, test_loader, device, output_dir)
+    metrics = evaluate_model(cfg, model, postprocessor, test_loader, device, output_dir)
 
     logger.info(
         "[Test] Precision: %.4f, Recall: %.4f, F1: %.4f, IoU: %.4f, OA: %.4f" % (

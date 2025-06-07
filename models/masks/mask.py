@@ -12,6 +12,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .d_projector import MultiheadAttention, DProjector
+
+
 # from models.masks.d_projector import MultiheadAttention, DProjector
 
 class TransformerDecoderLayer(nn.Module):
@@ -33,9 +35,9 @@ class TransformerDecoderLayer(nn.Module):
         self.dropout3 = nn.Dropout(dropout)
 
     def forward(self, tgt, memory,
-                tgt_mask = None, memory_mask = None,
-                tgt_key_padding_mask = None, memory_key_padding_mask = None,
-                tgt_is_causal = False, memory_is_causal = False):
+                tgt_mask=None, memory_mask=None,
+                tgt_key_padding_mask=None, memory_key_padding_mask=None,
+                tgt_is_causal=False, memory_is_causal=False):
         """
         tgt: [seq_len, batch_size, d_model]
         memory: [src_len, batch_size, d_model]
@@ -148,6 +150,7 @@ if __name__ == '__main__':
     print(logits.shape)  # 验证输出形状
 
     from thop import profile
+
     # 计算每个模块的FLOPs
     with torch.no_grad():
         # DProjector
@@ -167,7 +170,8 @@ if __name__ == '__main__':
         # Mask Head
         query_vec = model.d_projector(embs, merged_feat)
         attended_feat = merged_feat * (model.channel_attn(merged_feat) + query_vec.view(2, 256, 1, 1))
-        q_expanded = model.transformer_decoder(queries, visual_features).mean(0).view(2, 256, 1, 1).expand(-1, -1, 512, 512)
+        q_expanded = model.transformer_decoder(queries, visual_features).mean(0).view(2, 256, 1, 1).expand(-1, -1, 512,
+                                                                                                           512)
         cat_feat = torch.cat([attended_feat, q_expanded], dim=1)
         flops, params = profile(model.mask_head, inputs=(cat_feat,), verbose=False)
         print(f"Mask Head FLOPs: {flops / 1e9:.2f} G, Params: {params / 1e6:.2f} M")

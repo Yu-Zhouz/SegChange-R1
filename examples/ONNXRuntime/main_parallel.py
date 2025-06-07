@@ -617,8 +617,8 @@ def inference_worker_optimized(inference_queue: queue.Queue, result_queue: queue
                 for i, task in enumerate(tasks_to_process):
                     mask = batch_preds[i, 0]  # 取第i个样本的第0个通道
 
-                    # 后处理
-                    mask, _ = postprocess_mask(mask)
+                    # TODO: 后处理 PostProcessor
+                    # mask, _ = postprocess_mask(mask)
 
                     # 保存可视化结果
                     save_visualization(task, mask, output_dir)

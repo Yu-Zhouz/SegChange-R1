@@ -33,7 +33,7 @@ def train(cfg, model, criterion, dataloader, optimizer, device, epoch):
             images_a = images_a.to(device)
             images_b = images_b.to(device)
             embs = build_embs(prompts=prompt, text_encoder_name=cfg.model.text_encoder_name,
-                              freeze_text_encoder=cfg.model.freeze_text_encoder, device=device)
+                              freeze_text_encoder=cfg.model.freeze_text_encoder, device=device, batch_size=cfg.training.batch_size)
             labels = labels.to(device)
 
             optimizer.zero_grad()
@@ -145,7 +145,7 @@ def evaluate_model(cfg, model, postprocessor, dataloader, device, output_dir):
             images_a = images_a.to(device)
             images_b = images_b.to(device)
             embs = build_embs(prompts=prompt, text_encoder_name=cfg.model.text_encoder_name,
-                              freeze_text_encoder=cfg.model.freeze_text_encoder, device=device)
+                              freeze_text_encoder=cfg.model.freeze_text_encoder, device=device, batch_size=cfg.test.batch_size)
             labels = labels.to(device)
 
             outputs = model(images_a, images_b, embs)
@@ -155,8 +155,11 @@ def evaluate_model(cfg, model, postprocessor, dataloader, device, output_dir):
                 preds = (torch.sigmoid(outputs) > cfg.test.threshold).float().squeeze(1).cpu().numpy()
             else:
                 preds = torch.argmax(outputs, dim=1).cpu().numpy()
-            # TODO: 后处理PostProcessor
-            # post_preds, _ = postprocessor(preds)
+
+            # 后处理PostProcessor
+            if cfg.test.postprocess:
+                post_preds, _ = postprocessor(preds)
+
             labels_np = labels.cpu().numpy()
 
             all_preds.extend(preds.flatten())
