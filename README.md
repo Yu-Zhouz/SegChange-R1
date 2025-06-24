@@ -1,124 +1,191 @@
-# SegChange-R1: Augmented Reasoning for Remote Sensing Change Detection via Large Language Models
+<!--# [SegChange-R1:Augmented Reasoning for Remote Sensing Change Detection via Large Language Models](https://arxiv.org/abs/2506.17944) -->
 
-## 项目介绍
+English | [简体中文](README_zh.md) | [English](README.md) | [CSDN Blog](https://blog.csdn.net/weixin_62828995?spm=1000.2115.3001.5343)
 
-SegChange-R1 是一个基于深度学习的变化检测模型项目，主要用于分析和识别图像中的变化区域（如建筑物变化等）。该项目结合了视觉编码器与文本描述信息，通过双时相视觉编码器提取双时态图像的多尺度特征，利用特征差异模块进行特征差异建模，并引入多尺度特征融合模块融合多尺度特征。此外，它支持集成文本描述信息以增强检测能力，使用掩码预测头生成最终的变化掩码。项目还提供了完整的训练、测试流程及损失函数配置，适用于遥感图像、城市规划、环境监测等领域中的变化检测任务。
+<h2 align="center">
+  TAPNet: Transformer-based Dual-Optical Attention Fusion for Crowd Counting
+</h2>
 
-## 系统要求
+<p align="center">
+    <a href="https://huggingface.co/spaces/yourusername/TAPNet">
+        <img alt="hf" src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue">
+    </a>
+    <a href="https://github.com/Yu-Zhouz/SegChange-R1/blob/master/LICENSE">
+        <img alt="license" src="https://img.shields.io/badge/LICENSE-Apache%202.0-blue">
+    </a>
+    <a href="https://github.com/Yu-Zhouz/SegChange-R1/pulls">
+        <img alt="prs" src="https://img.shields.io/github/issues-pr/Yu-Zhouz/SegChange-R1">
+    </a>
+    <a href="https://github.com/Yu-Zhouz/SegChange-R1/issues">
+        <img alt="issues" src="https://img.shields.io/github/issues/Yu-Zhouz/SegChange-R1?color=olive">
+    </a>
+    <a href="https://arxiv.org/abs/2506.17944">
+        <img alt="arXiv" src="https://img.shields.io/badge/arXiv-2505.06937v1-red">
+    </a>
+    <a href="https://results.pre-commit.ci/latest/github/Yu-Zhouz/SegChange-R1/master">
+        <img alt="pre-commit.ci status" src="https://results.pre-commit.ci/badge/github/Yu-Zhouz/SegChange-R1/master.svg">
+    </a>
+    <a href="https://github.com/Yu-Zhouz/SegChange-R1">
+        <img alt="stars" src="https://img.shields.io/github/stars/Yu-Zhouz/SegChange-R1">
+    </a>
+</p>
+
+<p align="center">
+    📄 This is the official implementation of the paper:
+    <br>
+    <a href="https://arxiv.org/abs/2506.17944">SegChange-R1:Augmented Reasoning for Remote Sensing Change Detection via Large Language Models</a>
+</p>
+
+<p align="center">
+Fei Zhou
+</p>
+
+<p align="center">
+Neusoft Institute Guangdong, China & Airace Technology Co.,Ltd., China
+</p>
+
+<p align="center">
+    <a href="https://paperswithcode.com/sota/crowd-counting">
+        <img alt="sota" src="https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/transformer-based-dual-optical-attention-fusion/crowd-counting">
+    </a>
+</p>
+
+<p align="center">
+<strong>If you like SegChange-R1, please give us a ⭐! </strong>
+</p>
+
+ Remote sensing change detection is widely used in a variety of fields such as urban planning, terrain and geomorphology analysis, and environmental monitoring, mainly by analyzing the significant change differences of features(e.g., building changes) in the same spatial region at different time phases. In this paper, we propose a large language model (LLM) augmented inference approach (SegChange-R1), which enhances the detection capability by integrating textual descriptive information and aims at guiding the model to segment the more interested change regions, thus accelerating the convergence speed. Moreover, we design
+ a spatial transformation module (BEV) based on linear attention, which solves the problem of modal misalignment in change detection by unifying features from different temporal perspectives onto the BEV space. In addition, we construct the first dataset for building change detection from UAV viewpoints (DVCD), and our experiments on four widely-used change detection datasets show a significant improvement over existing methods. 
+
+![Baseline](https://i-blog.csdnimg.cn/direct/574c18c2382c442a8cb60b31de9c01ba.png)
+
+## 🚀 Updates
+
+- ✅ **[2024.06.01]** 开源代码
+- ✅ **[2025.06.22]** 上传到 [arXiv](https://arxiv.org/abs/2506.17944)。
+
+## Model Zoo
+
+![SOTA](https://i-blog.csdnimg.cn/direct/186edd2273c149bcb19f9aafb60b835b.png)
+
+
+## Quick Start
+
+### System Requirements
 
 - Python 3.12
 - CUDA + PyTorch
 - HuggingFace
-- 稳定的网络连接
-- 高质量代理IP（重要）
+- Stable network connection
+- High-quality proxy IPs (important)
 
-## 安装步骤
+### Installation
 
-### 1. 创建虚拟环境
+#### 1. Create a virtual environment
 
 ```bash
 conda create -n segchange python=3.12 -y
 conda activate segchange
 ```
 
-### 2. 安装依赖包
+#### 2. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. 配置HuggingFace镜像
+#### 3. Configuring HuggingFace Images
 
 ```bash
 vim ~/.bashrc
- 
+
 export HF_ENDPOINT="https://hf-mirror.com"
 
 source ~/.bashrc
 ```
 
-## 数据集介绍
-支持两种数据集结构格式：
-### 1. 默认结构：
-数据集的结构如下：
+### Data Preparation
+
+Two dataset structure formats are supported：
+
+#### 1. Default
+
+The structure of the dataset is as follows:
+
 ```text
 data/
   ├── train/
-  │   ├── A/                  # 第一时相训练图像
-  │   ├── B/                  # 第二时相训练图像
-  │   ├── label/              # 训练标签（变化掩码）
-  │   └── prompts.txt         # 训练集文本描述提示
+  │   ├── A/                  # First phase training image
+  │   ├── B/                  # Second phase training image
+  │   ├── label/              # Training Label (Change Mask)
+  │   └── prompts.txt         # The training set text describes the prompt
   ├── val/
-  │   ├── A/                  # 第一时相验证图像
-  │   ├── B/                  # 第二时相验证图像
-  │   ├── label/              # 验证标签（变化掩码）
-  │   └── prompts.txt         # 验证集文本描述提示
+  │   ├── A/              
+  │   ├── B/             
+  │   ├── label/         
+  │   └── prompts.txt 
   └── test/
-      ├── A/                  # 第一时相测试图像
-      ├── B/                  # 第二时相测试图像
-      ├── label/              # 测试标签（变化掩码）
-      └── prompts.txt         # 测试集文本描述提示
+      ├── A/            
+      ├── B/             
+      ├── label/      
+      └── prompts.txt     
 ```
-修改参数文件[configs](./configs/config.yaml)中的`data_format`为`default`。
+Change the `data_format` parameter file [configs](./configs/config.yaml) to `default`.
 
-### 2. 自定义结构：
-数据集的结构如下：
+#### 2. Custom
+
+The structure of the dataset is as follows:
+
 ```text
 data/
-  ├── A/                      # 第一时相训练图像
-  │── B/                      # 第二时相训练图像
-  │── label/                  # 训练标签（变化掩码）
-  │── list                    # 列表文件
-  │   ├── train.txt           # 训练集列表
-  │   ├── val.txt             # 训练集列表
-  │   └── test.txt            # 验证集列表
-  └── prompts.txt             # 训练集文本描述提示
+  ├── A/                      # First phase training image
+  │── B/                      # Second phase training image
+  │── label/                  # Label (Change Mask)
+  │── list                    # List file
+  │   ├── train.txt           # A list of training sets
+  │   ├── val.txt             # A list of validation sets
+  │   └── test.txt            # A list of test sets
+  └── prompts.txt             # Text description prompts
 ```
-修改参数文件[configs](./configs/config.yaml)中的`data_format`为`custom`。
+Change the `data_format` parameter file [configs](./configs/config.yaml) to `custom`.
 
-## 训练
+### Training
 
-### 生成词嵌入文件
+#### Generate word embedding files
 
-使用[文本生成](./examples/text_gen.py), 并修改参数文件[configs](./configs/config.yaml)中的`desc_embs`为`None`，执行脚本。
+Use [Text Generation](./examples/text_gen.py) and change the 'desc_embs' parameter file [configs](./configs/config.yaml) to 'None' to execute the script.
 
 ```bash
 python ./examples/text_gen.py -c ./configs/config.yaml
 ```
-如果需要做多类别变化检测，则需要手工标注类别描述文本。
+If you want to detect changes in multiple categories, you need to manually label the category description text.
 
-### 命令行训练
+#### Command-line training
 ```bash
 python train.py -c ./configs/config.yaml
 ```
 
-## 测试
+### testing
 ```bash
 python test.py -c ./configs/config.yaml
 ```
 
-## 推理TIF
+### Inference TIF
 ```bash
 python infer.py -c ./configs/config.yaml
 ```
 
-## app demo
+### app demo
 
 ```bash
 cd examples/gradio_app
 chmod +x ./run.sh
 bash run.sh
 ```
-## 贡献
+### DEDICATION
 
-欢迎提交问题和代码改进。请确保遵循项目的代码风格和贡献指南。
+Submit issues and code improvements. Make sure to follow the project's code style and contribution guidelines.
 
-## 许可证
+## LICENSE
 
-本项目使用 [MIT许可证](LICENSE)
-
-## 参考
-https://blog.csdn.net/weixin_45679938/article/details/142030784
-https://www.arxiv.org/pdf/2503.11070
-https://www.arxiv.org/abs/2503.16825
-https://zhuanlan.zhihu.com/p/627646794
+This project uses [Apache License 2.0](LICENSE)

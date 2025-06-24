@@ -123,6 +123,8 @@ class TrainingEngine:
                 patience=10,
                 verbose=True
             )
+        else:
+            raise ValueError(f"Unknown scheduler: {self.cfg.training.scheduler}")
 
         # 打印优化器信息
         self._log_optimizer_info()
