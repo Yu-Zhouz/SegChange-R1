@@ -55,8 +55,8 @@ Neusoft Institute Guangdong, China & Airace Technology Co.,Ltd., China
 
 ## 🚀 Updates
 
-- ✅ **[2024.06.01]** 开源代码
-- ✅ **[2025.06.22]** 上传到 [arXiv](https://arxiv.org/abs/2506.17944)。
+- ✅ **[2024.06.01]** Open source code
+- ✅ **[2025.06.22]** Upload to [arXiv](https://arxiv.org/abs/2506.17944)。
 
 ## Model Zoo
 
