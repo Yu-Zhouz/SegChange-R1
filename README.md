@@ -45,12 +45,6 @@ Neusoft Institute Guangdong, China & Airace Technology Co.,Ltd., China
 </p>
 
 <p align="center">
-    <a href="https://paperswithcode.com/sota/crowd-counting">
-        <img alt="sota" src="https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/transformer-based-dual-optical-attention-fusion/crowd-counting">
-    </a>
-</p>
-
-<p align="center">
 <strong>If you like SegChange-R1, please give us a ⭐! </strong>
 </p>
 
