@@ -183,3 +183,22 @@ Submit issues and code improvements. Make sure to follow the project's code styl
 ## LICENSE
 
 This project uses [Apache License 2.0](LICENSE)
+
+### Citation
+If you use RT-FINE in your research, please cite:
+
+<details open>
+<summary> bibtex </summary>
+
+```bibtex
+@article{zhou2025segchange-r1,
+  title={SegChange-R1:Augmented Reasoning for Remote Sensing Change Detection via Large Language Models},
+  author={Zhou, Fei},
+  journal={arXiv preprint arXiv:2506.17944},
+  year={2025},
+  eprint={/2506.17944},
+  archivePrefix={arXiv},
+  primaryClass={cs.CV}
+}
+```
+</details>
