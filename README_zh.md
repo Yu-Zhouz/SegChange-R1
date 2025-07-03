@@ -33,7 +33,7 @@
 <p align="center">
     📄 This is the official implementation of the paper:
     <br>
-    <a href="https://arxiv.org/abs/2506.17944">SegChange-R1:Augmented Reasoning for Remote Sensing Change Detection via Large Language Models</a>
+    <a href="https://arxiv.org/abs/2506.17944">SegChange-R1: LLM-Augmented Remote Sensing Change Detection</a>
 </p>
 
 <p align="center">
