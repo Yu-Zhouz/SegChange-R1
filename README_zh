@@ -1,9 +1,9 @@
-<!--# [SegChange-R1:Augmented Reasoning for Remote Sensing Change Detection via Large Language Models](https://arxiv.org/abs/2506.17944) -->
+<!--# [SegChange-R1: LLM-Augmented Remote Sensing Change Detection](https://arxiv.org/abs/2506.17944) -->
 
 简体中文 | [English](README.md) | [简体中文](README_zh.md) | [CSDN Blog](https://blog.csdn.net/weixin_62828995?spm=1000.2115.3001.5343)
 
 <h2 align="center">
-  TAPNet: Transformer-based Dual-Optical Attention Fusion for Crowd Counting
+  SegChange-R1: LLM-Augmented Remote Sensing Change Detection
 </h2>
 
 <p align="center">
