@@ -191,7 +191,7 @@ If you use RT-FINE in your research, please cite:
 
 ```bibtex
 @article{zhou2025segchange-r1,
-  title={SegChange-R1:Augmented Reasoning for Remote Sensing Change Detection via Large Language Models},
+  title={SegChange-R1: LLM-Augmented Remote Sensing Change Detection},
   author={Zhou, Fei},
   journal={arXiv preprint arXiv:2506.17944},
   year={2025},
